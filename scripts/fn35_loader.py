@@ -1471,7 +1471,20 @@ class FNLoader:
             rv = 0
         # native tail-call request (objc_msgSend -> real IMP)?
         if isinstance(rv, tuple) and rv and rv[0] == "pc":
-            self.wreg_pc(rv[1])
+            if rv[1]:
+                self.wreg_pc(rv[1])
+            else:
+                # imp==0 (e.g. an ObjC method resolved to a NULL IMP):
+                # jumping to 0 = guaranteed fetch fault. Refuse and
+                # return 0 to the caller instead -- far more survivable.
+                self.console("[stub] %s tail-call imp=0 (recv=0x%x "
+                             "sel=%r) -- returning 0 instead of PC=0"
+                             % (name, args[0] if args else 0,
+                                getattr(self.objc, "sel_name_of",
+                                        lambda s: "?")(
+                                    args[1] if len(args) > 1 else 0)))
+                self.wreg_x(0, 0)
+                self.wreg_pc(lr)
             return True
         # native-callback driver?
         if self.pending_py is not None:
