@@ -817,18 +817,23 @@ class FNLoader:
         # (global_sf_metal.metallib); we force -es2 for llvmpipe, so
         # GLSL_ES2_IOS has no cooked global shaders and the verify
         # asserts "Missing global shader FStereoLayerPS, Please make
-        # sure cooking was successful." Convert the cbnz at 0x10136d094
-        # into an unconditional branch to the cleanup path (0x10136d138):
-        # verification "passes", boot continues.
+        # sure cooking was successful."
+        # Definitive fix: the WHOLE verify function starts at
+        # 0x1023575d4 (prologue verified; called at 0x10284529c and the
+        # caller ignores the return value). Patch its first instruction
+        # to `ret` -- verification becomes a no-op for BOTH internal
+        # loops and BOTH "Missing global shader" fatal logs.
+        (0x1023575d4, b"\xc0\x03\x9f\xd6",
+         "global-shader verify function -> immediate ret (no-op)"),
+        # Belt & suspenders: the assert helper used by surrounding code
+        # (0x10136d04c, fmt "Assertion failed: %s [File:%s] [Line: %i]")
+        # routes Fatals to FOutputDeviceError -> RequestExit(1) -> abort.
+        # Convert the cbnz at 0x10136d094 into an unconditional branch
+        # to its cleanup path (0x10136d138).
         (0x10136d094, b"\x29\x00\x00\x14",
-         "global-shader verify fatal -> skip (b 0x10136d138)"),
-        # THE verify loop itself (~0x102357600): each entry calls a
-        # vtable[0x150] probe; w0!=0 means "problem", and the error path
-        # FIRST does FMsg::Logf (x4="Missing global shader %s...", verb
-        # =Fatal, which routes to FOutputDeviceError -> RequestExit(1)
-        # -> abort) and only THEN calls the assert helper above. Patch
-        # the "cbz w0, 0x1023577fc" at 0x10235772c into an unconditional
-        # "b 0x1023577fc": every entry takes the "no problem" path.
+         "assert-helper fatal path -> skip (b 0x10136d138)"),
+        # The verify loop's per-entry fatal Logf path (unreachable once
+        # the function rets immediately; kept for cold-start safety).
         (0x10235772c, b"\x34\x00\x00\x14",
          "verify-loop missing-detect -> always fine (b 0x1023577fc)"),
     ]
