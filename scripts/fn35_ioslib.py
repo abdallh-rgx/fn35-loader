@@ -59,7 +59,15 @@ SYSCTL_BY_NAME = {
     "kern.safeboot": 0,
     "kern.securelevel": 0,
     "kern.usrstack64": 0,
-    "hw.optional.armv8_crc32": 1,
+    # CRITICAL FIX 2025-10-25: unicorn 2.1.4 mis-executes the ARMv8
+    # hardware CRC32 instructions (verified in isolation: crc32cb of a
+    # single byte returns 0x00000000!). With this flag set to 1, libpng
+    # and zlib use hw crc32 for chunk checksums -> EVERY png reports
+    # "IHDR: CRC error" despite valid data -> the engine's image/text
+    # pipeline derails into the precomposedString storm + task-graph
+    # deadlock. Reporting NO hw crc32 makes libpng use its correct
+    # software table path.
+    "hw.optional.armv8_crc32": 0,
     "hw.optional.armv8_crypto": 1,
 }
 
