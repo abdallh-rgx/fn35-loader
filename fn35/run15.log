@@ -1,0 +1,64 @@
+[fn35] integrated loader starting
+[fn35] mach-o: /home/z/my-project/fn35/extracted/Payload/FortniteClient.app/FortniteClient
+[fn35] cryptid=0 (0 = decrypted, good)
+[pakfs] 3260 entries, mount '../../../', 278 dirs
+[preinit] fake singleton for 0x10552ea60 (vt=0x510000000040 obj=0x510000000140)
+[objc] 595 binary classes parsed; root NSObject @0x510000000740
+[gl] 84 GL imports bridged to Mesa/llvmpipe
+[MACH-O] mapped 1 segment ranges, 33 sections
+[dyld] filled 1436 GOT slots, applied 15056 binds, 1721 stubs created
+[dyld] 773 module initializers, main at 0x102dae84c
+[run] scheduler start (budget 280s, slice=5000000 instr)
+[dyld] init 2/773 at 0x1002450d8
+[dyld] init 3/773 at 0x10024510c
+[dyld] init 4/773 at 0x100247320
+[dyld] init 5/773 at 0x1002492a0
+[dyld] init 6/773 at 0x10024a3a0
+[dyld] init 7/773 at 0x10024cb18
+[dyld] init 8/773 at 0x10024ecc4
+[dyld] init 9/773 at 0x10028d074
+[dyld] init 10/773 at 0x1002948c8
+[dyld] init 11/773 at 0x100349904
+[dyld] init 12/773 at 0x10035f2b8
+[dyld] init 13/773 at 0x10036a378
+[dyld] init 14/773 at 0x1004526b0
+[dyld] init 15/773 at 0x100665064
+[dyld] init 16/773 at 0x10069a2d0
+[dyld] init 17/773 at 0x1006bc940
+[dyld] init 18/773 at 0x1006c215c
+[dyld] init 19/773 at 0x1006c8d38
+[dyld] init 20/773 at 0x1006fbc14
+[dyld] init 21/773 at 0x100702064
+[dyld] init 22/773 at 0x10071ed98
+[dyld] init 23/773 at 0x100723920
+[dyld] init 24/773 at 0x100737da8
+[dyld] init 25/773 at 0x100747c88
+[dyld] init 26/773 at 0x100748a38
+[dyld] init 27/773 at 0x10074a680
+[dyld] init 28/773 at 0x100750cf4
+[dyld] init 29/773 at 0x100752490
+[dyld] init 30/773 at 0x100752d6c
+[dyld] init 31/773 at 0x100755820
+[dyld] init 32/773 at 0x100761218
+[dyld] init 33/773 at 0x100762500
+[dyld] init 34/773 at 0x10076dde0
+[dyld] init 35/773 at 0x100790788
+[warn] impl _mmap raised NameError("name 'os' is not defined")
+[warn] impl _mmap raised NameError("name 'os' is not defined")
+[NSLog] %s
+[abort] caller lr=0x100ffdd48 (__Z21empty_response_to_xmlI42vx_resp_connector_set_local_speaker_volumeEPcRKN11VivoxSystem6StringEP15vx_message_base+0x94bc48) -- last stubs:
+   ('_mach_host_self', [123145310694864, 4385126648, 8388608, 123145310694940, 0], 'main')
+   ('_host_statistics', [89060441905280, 2, 123145310694768, 123145310694764, 0], 'main')
+   ('_task_info', [2819, 20, 123145310694712, 123145310694708, 0], 'main')
+   ('_mmap', [0, 2097152, 3, 4098, 4294967295], 'main')
+   ('___cxa_guard_acquire', [4385542656, 0, 3, 4098, 4294967295], 'main')
+   ('___cxa_guard_release', [4385542656, 0, 3, 4098, 4294967295], 'main')
+   ('_mach_host_self', [123145310694816, 4385126648, 3, 4098, 4294967295], 'main')
+   ('_host_statistics', [89060441905280, 2, 123145310694720, 123145310694716, 4294967295], 'main')
+   ('_task_info', [2819, 20, 123145310694664, 123145310694660, 4294967295], 'main')
+   ('_mmap', [0, 1687552, 3, 4098, 4294967295], 'main')
+   ('_NSLog', [4362591184, 123145310694852, 1, 45, 4294967295], 'main')
+   ('_abort', [1, 123145310694852, 1, 45, 4294967295], 'main')
+[FATAL] abort() called from 0x100ffdd48 (__Z21empty_response_to_xmlI42vx_resp_connector_set_local_speaker_volumeEPcRKN11VivoxSystem6StringEP15vx_message_base+0x94bc48)
+[run] stopped: reason=None fatal='abort() called from 0x100ffdd48 (__Z21empty_response_to_xmlI42vx_resp_connector_set_local_speaker_volumeEPcRKN11VivoxSystem6StringEP15vx_message_base+0x94bc48)' exit=None
+[fn35] report -> /home/z/my-project/download/fn35/fn35_boot_report.txt

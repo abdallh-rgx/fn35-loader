@@ -1,0 +1,253 @@
+========================================================================
+FN3.5 INTEGRATED LOADER -- BOOT REPORT
+generated: 2026-10-24 11:11:48
+========================================================================
+
+1. EXECUTION
+   stop reason : budget
+   fatal       : None
+   exit code   : None
+   wall time   : 600.0 s (budget 600 s)
+   instructions: ~3899765000000 (approx, 5000000 per slice)
+   phase       : main (mod_init 773/773 done)
+
+2. LINK (dyld substitute)
+   GOT slots filled : 1741
+   import stubs     : 1715
+   data cells       : 15949
+   mod_init funcs   : 773
+
+3. THREADS (15328 created, 17 tracked)
+   created by name:
+   of.timerForSplashScreen               10043
+   of.RecordPeakMemory                    5264
+   pthread                                  15
+   of.MainAppThread:                         1
+   of.NoUrlCommandLine                       1
+   dispatch_async                            1
+   main               tid=1000     pc=000102db0504 blocked  instr~185000000 ('forever', 'uikit_runloop')
+   of.MainAppThread:  tid=1010     pc=000101b66a64 blocked  instr~1742145000000 ('sleep', None) wake_ns=1792840307745075353 (now=1792840307744425113)
+   pthread            tid=11b0     pc=000102c52688 blocked  instr~5000000 ('cond', 109951174328512)
+   pthread            tid=11c8     pc=000102c52688 blocked  instr~5000000 ('cond', 109951174328832)
+   pthread            tid=11d0     pc=000102c52688 blocked  instr~5000000 ('cond', 109951174329152)
+   pthread            tid=11d8     pc=000102c52688 blocked  instr~5000000 ('cond', 109951174329472)
+   pthread            tid=1300     pc=000102c52628 blocked  instr~195605000000 ('cond', 109951174329792) wake_ns=1792840308010000000 (now=1792840307744425113)
+   pthread            tid=1318     pc=000102c52628 blocked  instr~195390000000 ('cond', 109951174329952) wake_ns=1792840308010000000 (now=1792840307744425113)
+   pthread            tid=1320     pc=000102c52628 blocked  instr~195155000000 ('cond', 109951174330112) wake_ns=1792840308010000000 (now=1792840307744425113)
+   pthread            tid=1328     pc=000102c52628 blocked  instr~194940000000 ('cond', 109951174330272) wake_ns=1792840308010000000 (now=1792840307744425113)
+   pthread            tid=1330     pc=000102c52628 blocked  instr~194680000000 ('cond', 109951174330432) wake_ns=1792840308010000000 (now=1792840307744425113)
+   pthread            tid=1338     pc=000102c52628 blocked  instr~194490000000 ('cond', 109951174330592) wake_ns=1792840308010000000 (now=1792840307744425113)
+   pthread            tid=1858     pc=00010101904c blocked  instr~211570000000 ('sleep', None) wake_ns=1792840307749777807 (now=1792840307744425113)
+   pthread            tid=19f0     pc=000102c52628 blocked  instr~194240000000 ('cond', 109951203890368) wake_ns=1792840308010000000 (now=1792840307744425113)
+   pthread            tid=19f8     pc=000102c52628 blocked  instr~194010000000 ('cond', 109951203890048) wake_ns=1792840308010000000 (now=1792840307744425113)
+   pthread            tid=1a08     pc=000102c52628 blocked  instr~193785000000 ('cond', 109951203889888) wake_ns=1792840308010000000 (now=1792840307744425113)
+   pthread            tid=1a10     pc=000102c52628 blocked  instr~193550000000 ('cond', 109951203889728) wake_ns=1792840308010000000 (now=1792840307744425113)
+
+4. TOP STUB CALLS (imported functions)
+   _mach_absolute_time                          754584
+   _pthread_mutex_lock                          690641
+   _pthread_mutex_unlock                        690627
+   _gettimeofday                                394383
+   _usleep                                      390564
+   _pthread_cond_timedwait                      389169
+   _pthread_getspecific                         353749
+   _objc_msgSend                                349821
+   _objc_getProperty                            348259
+   _strcpy                                       40200
+   _pthread_self                                 14608
+   _pthread_mach_thread_np                       14606
+   ___cxa_atexit                                  7480
+   _mach_host_self                                5270
+   _host_statistics                               5269
+   _task_info                                     5268
+   _pthread_mutex_init                            3650
+   _pthread_mutexattr_init                        3619
+   _pthread_mutexattr_settype                     3619
+   _pthread_mutexattr_destroy                     3619
+   _memmove                                       3404
+   _bzero                                         3069
+   _memset                                        1445
+   _CFStringGetBytes                               760
+   _mmap                                           497
+   _CFStringGetLength                              381
+   _stat                                           311
+   _strtol                                         304
+   _munmap                                         299
+   ___cxa_guard_acquire                            288
+   ___cxa_guard_release                            288
+   _free                                           167
+   _strrchr                                        134
+   _snprintf                                       119
+   _strncpy                                         92
+   _lseek                                           85
+   _NSLog                                           84
+   _atof                                            73
+   _open                                            66
+   _close                                           65
+
+5. UNIMPLEMENTED STUBS (auto-returned 0)
+   _pthread_getschedparam                           16
+   _pthread_setschedparam                           16
+   _logf                                             7
+   _objc_setProperty_atomic                          6
+   _uuid_generate                                    5
+   _pthread_rwlock_init                              4
+   ___strncat_chk                                    4
+   _CFLocaleGetValue                                 4
+   _objc_setProperty_nonatomic                       2
+   _NSSearchPathForDirectoriesInDomains              2
+   _CFLocaleCopyCurrent                              2
+   _acosf                                            1
+   _thread_policy_set                                1
+   _CFLocaleCopyPreferredLanguages                   1
+   _tzset                                            1
+   _gethostname                                      1
+
+6. SYSCALLS
+
+9. OBJC (last 20 of 88)
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000045190 precomposedStringWithCanonicalMapping]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000045b10 precomposedStringWithCanonicalMapping]
+   ?? [0x600000045b10 precomposedStringWithCanonicalMapping]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x7000047ffe30 initWithFrame:]
+
+10. FAULT LOG
+   (none)
+
+11. CONSOLE TAIL (last 120 lines)
+   printf: LogICUInternationalization: Display: ICU TimeZone Detection - Raw Offset: +123145314879792:29, Platform Override: ''
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogICUInternationalization: Display: ICU TimeZone Detection - Raw Offset: +123145314879792:29, Platform Override: ''
+   [kernel] sysctlbyname(kern.osrevision) -> ENOENT
+   [kernel] sysctlbyname(kern.uuid) -> ENOENT
+   [kernel] sysctlbyname(machdep.cpu.brand_string) -> ENOENT
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogStreaming: Display: Took <fmt-err unsupported operand
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogStreaming: Display: Took <fmt-err unsupported operand
+   [NSLog] LogInit: RandInit(123145314881152) SRandInit(123145314881152).
+   [NSLog] LogTaskGraph: Started task graph with 123145314880992 named threads and 123145314880992 total threads with 123145314880992 sets of task threads.
+   [NSLog] LogICUInternationalization: Display: ICU TimeZone Detection - Raw Offset: +123145314879792:29, Platform Override: ''
+   [NSLog] LogStreaming: Display: Took <fmt-err unsupported operand
+   [NSLog] LogInit: Build: ++Fortnite+Release-3.5-CL-3994867
+   [NSLog] LogInit: Engine Version: 123145314887440.123145314887440.123145314887440-123145314887440+++Fortnite+Release-3.5
+   [NSLog] LogInit: Compatible Engine Version: 123145314887440.123145314887440.123145314887440-123145314887440+++Fortnite+Release-3.5
+   [NSLog] LogInit: Net CL: 123145314880352
+   [NSLog] LogInit: OS: IOS (123145314887440.123145314887440.123145314887440), CPU: iPhone10,4, GPU: GenericGPUBrand
+   [NSLog] LogInit: Compiled (64-bit): Apr 10 2018 02:20:16
+   [NSLog] LogInit: Compiled with Clang: 9.0.0 (clang-900.0.39.2)
+   [NSLog] LogInit: Build Configuration: Shipping
+   [NSLog] LogInit: Branch Name: ++Fortnite+Release-3.5
+   [NSLog] LogInit: Command Line:
+   [NSLog] LogInit: Base Directory:
+   [NSLog] LogInit: Installed Engine Build: 123145314880352
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogStreaming: Display: Took <fmt-err unsupported operand
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogStreaming: Display: Took <fmt-err unsupported operand
+   [NSLog] LogStreaming: Display: Took <fmt-err unsupported operand
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogLinker: Error: ReadRedirectsFromIni failed to parse ValueChanges for Redirect (OldName="ENoiseFunction",ValueChanges=(("NOISEFUNCTION_FastGradient","NOISEFUNCTION_GradientTex3D"), ("NOISEFUNCTION_Gradient","NOISEFUNCTION_ValueALU"), ("NOISEFUNCTION_Perlin","NOISEFUNCTION_GradientTex"), ("NOISEFUNCTION_Simplex","NOISEFUNCTION_SimplexTex")) )!
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: %s
+   [NSLog] LogLinker: Error: ReadRedirectsFromIni failed to parse ValueChanges for Redirect (OldName="ENoiseFunction",ValueChanges=(("NOISEFUNCTION_FastGradient","NOISEFUNCTION_GradientTex3D"), ("NOISEFUNCTION_Gradient","NOISEFUNCTION_ValueALU"), ("NOISEFUNCTION_Perlin","NOISEFUNCTION_GradientTex"), ("NOISEFUNCTION_Simplex","NOISEFUNCTION_SimplexTex")) )!
+   [NSLog] LogInit: Presizing for max 123145314879984 objects, including 123145314879984 objects not considered by GC, pre-allocating 123145314879984 bytes for permanent pool.
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogStreaming: Display: Async Loading initialized: Event Driven Loader: true, Async Loading Thread: false, Async Post Load: true
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogStreaming: Display: Async Loading initialized: Event Driven Loader: true, Async Loading Thread: false, Async Post Load: true
+   [NSLog] LogStreaming: Display: Async Loading initialized: Event Driven Loader: true, Async Loading Thread: false, Async Post Load: true
+   [NSLog] `Ts
+   [NSLog] LogIOS: Selected Device Profile: [IPhone8]
+   [NSLog] LogInit: Applying CVar settings loaded from the selected device profile: [IPhone8]
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogHAL: Display: Platform has ~ 123145314880320 GB [123145314880320 / 123145314880320 / 123145314880320], which maps to Smaller [LargestMinGB=123145314880320, LargerMinGB=123145314880320, DefaultMinGB=123145314880320, SmallerMinGB=123145314880320, SmallestMinGB=0)
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: %s
+   [NSLog] LogHAL: Display: Platform has ~ 123145314880320 GB [123145314880320 / 123145314880320 / 123145314880320], which maps to Smaller [LargestMinGB=123145314880320, LargerMinGB=123145314880320, DefaultMinGB=123145314880320, SmallerMinGB=123145314880320, SmallestMinGB=0)
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.MobileContentScaleFactor:2.0]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[MobileDPI.FrontEnd:0.7]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[MobileDPI.InGame:0.65]]
+   [NSLog] LogInit: Going up to parent DeviceProfile [IOS_High]
+   [NSLog] LogInit: Setting Device Profile CVar: [[sg.ViewDistanceQuality:2]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[sg.AntiAliasingQuality:2]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[sg.ShadowQuality:2]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[sg.PostProcessQuality:2]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[sg.TextureQuality:2]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[sg.EffectsQuality:2]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[sg.FoliageQuality:2]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.MaxAnisotropy:4]]
+   [NSLog] LogInit: Going up to parent DeviceProfile [IOS]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.PostProcessing.DisableMaterials:0]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.ScreenPercentage:100]]
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogInit: Warning: Creating unregistered Device Profile CVar: [[r.Scalability.MaxTextureQualityForLowVirtualMemory:0]]
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogInit: Warning: Creating unregistered Device Profile CVar: [[r.Scalability.MaxTextureQualityForLowVirtualMemory:0]]
+   [NSLog] LogInit: Warning: Creating unregistered Device Profile CVar: [[r.Scalability.MaxTextureQualityForLowVirtualMemory:0]]
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogInit: Warning: Creating unregistered Device Profile CVar: [[r.Scalability.MaxTextureQualityForLowVirtualMemory:0]]
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogInit: Warning: Creating unregistered Device Profile CVar: [[r.Scalability.MaxTextureQualityForLowVirtualMemory:0]]
+   [NSLog] @e&
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogInit: Warning: Creating unregistered Device Profile CVar: [[r.Scalability.MaxTextureQualityForLowVirtualMemory:0]]
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogInit: Warning: Creating unregistered Device Profile CVar: [[r.Scalability.MaxTextureQualityForLowVirtualMemory:0]]
+   [NSLog] LogInit: Warning: Creating unregistered Device Profile CVar: [[r.MetalDomainParameterSize:0]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.MorphTarget.Mode:0]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[Mobile.FormFactor:0]]
+   [NSLog] LogInit: Going up to parent DeviceProfile [Mobile]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.Streaming.PoolSize:300]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[fort.skippreloadhack:0]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[Fort.CosmeticManager.MaxHeroTypes:16]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[fort.PreloadUIDataManager:0]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[slate.AbsoluteIndices:1]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[FX.AllowGPUParticles:1]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[fx.GPUSimulationTextureSizeX:512]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[fx.GPUSimulationTextureSizeY:512]]
+   [NSLog] @;P
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.SupportReversedIndexBuffers:False]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.SupportDepthOnlyIndexBuffers:False]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[ai.NavCollisionAvailable:0]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.MaterialQualityLevel:0]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.Streaming.UseFixedPoolSize:1]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.DiscardUnusedQuality:1]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.ShaderPipelineCache.Enabled:1]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.ShaderPipelineCache.LogPSO:0]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.ShaderPipelineCache.ReportPSO:1]]
+   [NSLog]  }w
+   [NSLog]  }w
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.SkeletalMeshLODRadiusScale:0.6]]
+   [NSLog] @|w
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.DetailMode:0]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.CookOutUnusedDetailModeComponents:1]]
+   [NSLog] @|w
+   [NSLog] @|w
+   [NSLog] @|w
+   [NSLog] LogInit: Setting Device Profile CVar: [[grass.DisableDynamicShadows:1]]
+   [NSLog] `{w
+   [NSLog] `{w
+   [NSLog] `{w
+   [NSLog] `{w
+   [NSLog] `{w
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.LandscapeLOD0DistributionScale:1.0]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.LandscapeLODDistributionScale:0.5]]
+   [NSLog] LogInit: Setting Device Profile CVar: [[Athena.CookOutMediumLevelHLODs:0]]
+   [run] stopped: reason=budget fatal=None exit=None

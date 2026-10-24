@@ -1,0 +1,82 @@
+﻿Log file open, 14/09/04 14:09:04
+LogInit: RandInit(123145314881152) SRandInit(123145314881152).
+LogTaskGraph: Started task graph with 123145314880992 named threads and 123145314880992 total threads with 123145314880992 sets of task threads.
+LogICUInternationalization: Display: ICU TimeZone Detection - Raw Offset: +123145314879792:29, Platform Override: ''
+LogStreaming: Display: Took <fmt-err unsupported operand 
+LogInit: Build: ++Fortnite+Release-3.5-CL-3994867
+LogInit: Engine Version: 123145314887440.123145314887440.123145314887440-123145314887440+++Fortnite+Release-3.5
+LogInit: Compatible Engine Version: 123145314887440.123145314887440.123145314887440-123145314887440+++Fortnite+Release-3.5
+LogInit: Net CL: 123145314880352
+LogInit: OS: IOS (123145314887440.123145314887440.123145314887440), CPU: iPhone10,4, GPU: GenericGPUBrand
+LogInit: Compiled (64-bit): Apr 10 2018 02:20:16
+LogInit: Compiled with Clang: 9.0.0 (clang-900.0.39.2)
+LogInit: Build Configuration: Shipping
+LogInit: Branch Name: ++Fortnite+Release-3.5
+LogInit: Command Line: 
+LogInit: Base Directory: 
+LogInit: Installed Engine Build: 123145314880352
+LogStreaming: Display: Took <fmt-err unsupported operand 
+LogLinker: Error: ReadRedirectsFromIni failed to parse ValueChanges for Redirect (OldName="ENoiseFunction",ValueChanges=(("NOISEFUNCTION_FastGradient","NOISEFUNCTION_GradientTex3D"), ("NOISEFUNCTION_Gradient","NOISEFUNCTION_ValueALU"), ("NOISEFUNCTION_Perlin","NOISEFUNCTION_GradientTex"), ("NOISEFUNCTION_Simplex","NOISEFUNCTION_SimplexTex")) )!
+LogInit: Presizing for max 123145314879984 objects, including 123145314879984 objects not considered by GC, pre-allocating 123145314879984 bytes for permanent pool.
+LogStreaming: Display: Async Loading initialized: Event Driven Loader: true, Async Loading Thread: false, Async Post Load: true
+LogInit: Object subsystem initialized
+LogIOS: Selected Device Profile: [IPhone8]
+LogInit: Applying CVar settings loaded from the selected device profile: [IPhone8]
+LogHAL: Display: Platform has ~ 123145314880320 GB [123145314880320 / 123145314880320 / 123145314880320], which maps to Smaller [LargestMinGB=123145314880320, LargerMinGB=123145314880320, DefaultMinGB=123145314880320, SmallerMinGB=123145314880320, SmallestMinGB=0)
+LogInit: Setting Device Profile CVar: [[r.MobileContentScaleFactor:2.0]]
+LogInit: Setting Device Profile CVar: [[MobileDPI.FrontEnd:0.7]]
+LogInit: Setting Device Profile CVar: [[MobileDPI.InGame:0.65]]
+LogInit: Going up to parent DeviceProfile [IOS_High]
+LogInit: Setting Device Profile CVar: [[sg.ViewDistanceQuality:2]]
+LogInit: Setting Device Profile CVar: [[sg.AntiAliasingQuality:2]]
+LogInit: Setting Device Profile CVar: [[sg.ShadowQuality:2]]
+LogInit: Setting Device Profile CVar: [[sg.PostProcessQuality:2]]
+LogInit: Setting Device Profile CVar: [[sg.TextureQuality:2]]
+LogInit: Setting Device Profile CVar: [[sg.EffectsQuality:2]]
+LogInit: Setting Device Profile CVar: [[sg.FoliageQuality:2]]
+LogInit: Setting Device Profile CVar: [[r.MaxAnisotropy:4]]
+LogInit: Going up to parent DeviceProfile [IOS]
+LogInit: Setting Device Profile CVar: [[r.PostProcessing.DisableMaterials:0]]
+LogInit: Setting Device Profile CVar: [[r.ScreenPercentage:100]]
+LogInit: Warning: Creating unregistered Device Profile CVar: [[r.Scalability.MaxTextureQualityForLowVirtualMemory:0]]
+LogInit: Warning: Creating unregistered Device Profile CVar: [[r.MetalHullParameterSize:0]]
+LogInit: Warning: Creating unregistered Device Profile CVar: [[r.MetalDomainParameterSize:0]]
+LogInit: Setting Device Profile CVar: [[r.MorphTarget.Mode:0]]
+LogInit: Setting Device Profile CVar: [[Mobile.FormFactor:0]]
+LogInit: Going up to parent DeviceProfile [Mobile]
+LogInit: Setting Device Profile CVar: [[r.Streaming.PoolSize:300]]
+LogInit: Setting Device Profile CVar: [[fort.skippreloadhack:0]]
+LogInit: Setting Device Profile CVar: [[Fort.CosmeticManager.MaxHeroTypes:16]]
+LogInit: Setting Device Profile CVar: [[fort.PreloadUIDataManager:0]]
+LogInit: Setting Device Profile CVar: [[slate.AbsoluteIndices:1]]
+LogInit: Setting Device Profile CVar: [[FX.AllowGPUParticles:1]]
+LogInit: Setting Device Profile CVar: [[fx.GPUSimulationTextureSizeX:512]]
+LogInit: Setting Device Profile CVar: [[fx.GPUSimulationTextureSizeY:512]]
+LogInit: Setting Device Profile CVar: [[r.CustomDepth:0]]
+LogInit: Setting Device Profile CVar: [[r.SupportReversedIndexBuffers:False]]
+LogInit: Setting Device Profile CVar: [[r.SupportDepthOnlyIndexBuffers:False]]
+LogInit: Setting Device Profile CVar: [[ai.NavCollisionAvailable:0]]
+LogInit: Setting Device Profile CVar: [[r.MaterialQualityLevel:0]]
+LogInit: Setting Device Profile CVar: [[r.Streaming.UseFixedPoolSize:1]]
+LogInit: Setting Device Profile CVar: [[r.DiscardUnusedQuality:1]]
+LogInit: Setting Device Profile CVar: [[r.ShaderPipelineCache.Enabled:1]]
+LogInit: Setting Device Profile CVar: [[r.ShaderPipelineCache.LogPSO:0]]
+LogInit: Setting Device Profile CVar: [[r.ShaderPipelineCache.ReportPSO:1]]
+LogInit: Setting Device Profile CVar: [[lod.TemporalLag:0]]
+LogInit: Setting Device Profile CVar: [[r.SkeletalMeshLODBias:1]]
+LogInit: Setting Device Profile CVar: [[r.SkeletalMeshLODRadiusScale:0.6]]
+LogInit: Setting Device Profile CVar: [[foliage.MinLod:1]]
+LogInit: Setting Device Profile CVar: [[r.DetailMode:0]]
+LogInit: Setting Device Profile CVar: [[r.CookOutUnusedDetailModeComponents:1]]
+LogInit: Setting Device Profile CVar: [[r.DisableDistortion:1]]
+LogInit: Setting Device Profile CVar: [[r.BloomQuality:0]]
+LogInit: Setting Device Profile CVar: [[r.LightShaftQuality:0]]
+LogInit: Setting Device Profile CVar: [[grass.DisableDynamicShadows:1]]
+LogInit: Setting Device Profile CVar: [[r.Tonemapper.Sharpen:0]]
+LogInit: Setting Device Profile CVar: [[r.PostProcessAAQuality:0]]
+LogInit: Setting Device Profile CVar: [[r.LightFunctionQuality:0]]
+LogInit: Setting Device Profile CVar: [[r.SimpleForwardShading:0]]
+LogInit: Setting Device Profile CVar: [[r.EyeAdaptationQuality:0]]
+LogInit: Setting Device Profile CVar: [[r.LandscapeLOD0DistributionScale:1.0]]
+LogInit: Setting Device Profile CVar: [[r.LandscapeLODDistributionScale:0.5]]
+LogInit: Setting Device Profile CVar: [[Athena.CookOutMediumLevelHLODs:0]]
