@@ -92,7 +92,17 @@ def _build_regs():
         xs.append(c)
     qs = [getattr(a64, "UC_ARM64_REG_Q%d" % i) for i in range(32)
           if hasattr(a64, "UC_ARM64_REG_Q%d" % i)]
+    # CRITICAL: NZCV (condition flags) MUST be saved/restored per thread.
+    # A slice can end exactly between a `cmp` and its `b.cc` -- the next
+    # thread's first arithmetic write would otherwise hijack the branch
+    # decision when the waiter resumes (observed: intermittent crashes
+    # at DIFFERENT bit-loop sites each run with garbage x8/x16, e.g.
+    # pak-index decode loops running with x8=0xc02f50 where the loop
+    # bound was 0x3c).
     save = list(xs) + [a64.UC_ARM64_REG_SP, a64.UC_ARM64_REG_PC] + qs
+    nzcv = getattr(a64, "UC_ARM64_REG_NZCV", None)
+    if nzcv is not None:
+        save.append(nzcv)
     return xs, qs, save
 
 
