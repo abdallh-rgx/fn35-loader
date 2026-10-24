@@ -355,11 +355,12 @@ _P_OUT = {          # out-params: {name: (arg_idx, nbytes_to_copy_back)}
     "glGetShaderiv": (2, 4),
     "glGetProgramiv": (2, 4),
     "glGetBufferParameteriv": (2, 4),
-    "glGetIntegerv": (1, 64),
-    "glGetBooleanv": (1, 64),
-    "glGetFloatv": (1, 64),
     "glGetProgramInfoLog": (2, 4),
     "glGetShaderInfoLog": (2, 4),
+    # NB: glGetIntegerv/glGetBooleanv/glGetFloatv are handled by explicit
+    # cfunc handlers below with per-pname ARITY: a fixed 64-byte copyback
+    # smashes the caller's stack (same class of bug that zeroed x29/x30
+    # and killed MainAppThread at GL_MAX_FRAGMENT_UNIFORM_VECTORS).
 }
 
 # in-pointers: {name: (arg_idx, size_fn(args) -> bytes)}; guest data is
@@ -874,30 +875,80 @@ def _glGetError(l):
     return 0          # report GL_NO_ERROR always (keep engine happy)
 
 
-@cfunc("_glGetIntegerv")
-def _glGetIntegerv(l, pname, ptr):
+# ---- state getters with per-pname ARITY -----------------------------
+# ARITY IS CRITICAL: the engine queries scalar limits into single stack
+# slots ("GLint v; glGetIntegerv(GL_MAX_..., &v);"). A fixed-size block
+# copyback smashes zero bytes past the variable and zeroes the caller's
+# saved x29/x30 -> ret to NULL -> MainAppThread died right after
+# "GL_MAX_FRAGMENT_UNIFORM_VECTORS" (segAJ/segAN bug). Never write more
+# than the pname's arity.
+
+_INT_ARITY = {
+    0x0D33: 2,   # GL_MAX_VIEWPORT_DIMS
+    0x0BA2: 4,   # GL_VIEWPORT
+    0x0C10: 4,   # GL_SCISSOR_BOX
+    0x86A3: -1,  # GL_COMPRESSED_TEXTURE_FORMATS (dynamic count)
+}
+
+_FLOAT_ARITY = {
+    0x0C22: 4,   # GL_COLOR_CLEAR_VALUE
+    0x0B70: 2,    # GL_DEPTH_RANGE
+    0x846D: 2,    # GL_ALIASED_POINT_SIZE_RANGE
+    0x846E: 2,    # GL_ALIASED_LINE_WIDTH_RANGE
+}
+
+_BOOL_ARITY = {
+    0x0C23: 4,   # GL_COLOR_WRITEMASK
+    0x0BE2: 1,   # GL_BLEND
+}
+
+
+def _gl_getv(l, cname, pname, ptr, arity_tbl, ctype):
     if not _ensure(l):
         return 0
-    vals = {
-        0x0D33: [SCREEN_W],        # GL_MAX_VIEWPORT_DIMS (first)
-        0x8872: [16],              # GL_MAX_TEXTURE_IMAGE_UNITS
-        0x8B4C: [16],              # GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS
-        0x8DFB: [16],              # GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS
-        0x8B4D: [16],              # GL_MAX_VERTEX_ATTRIBS
-        0x8869: [8],                # GL_MAX_VERTEX_UNIFORM_VECTORS
-        0x8DFB + 0: [16],
-    }
+    n = arity_tbl.get(pname & 0xFFFFFFFF, 1)
+    if n == -1:
+        n = 0
+        try:
+            cnt = (ctypes.c_int * 1)()
+            ctypes.CFUNCTYPE(None, ctypes.c_uint, ctypes.c_void_p)(
+                GLES.proc("glGetIntegerv"))(0x86A2, cnt)
+            n = max(0, min(cnt[0], 128))
+        except Exception:
+            n = 0
     try:
-        cf = ctypes.CFUNCTYPE(None, ctypes.c_uint,
-                              ctypes.c_void_p)(GLES.proc("glGetIntegerv"))
-        host = (ctypes.c_int * 4)()
+        cf = ctypes.CFUNCTYPE(None, ctypes.c_uint, ctypes.c_void_p)(
+            GLES.proc(cname))
+        host = (ctype * max(n, 1))()
         cf(pname & 0xFFFFFFFF, host)
-        if ptr:
-            for i in range(4):
-                l.w32(ptr + 4 * i, host[i])
+        if ptr and n:
+            # raw block write of EXACTLY n elements (int bits preserved,
+            # floats written as their IEEE bit pattern)
+            raw = bytes(bytearray(
+                (ctypes.c_ubyte * (n * ctypes.sizeof(ctype)))
+                .from_buffer(host)))
+            l.wrb(ptr, raw)
     except Exception as e:
-        l.warn("glGetIntegerv %r" % (e,))
+        l.warn("%s %r" % (cname, e))
     return 0
+
+
+@cfunc("_glGetIntegerv")
+def _glGetIntegerv(l, pname, ptr):
+    return _gl_getv(l, "glGetIntegerv", pname, ptr,
+                    _INT_ARITY, ctypes.c_int)
+
+
+@cfunc("_glGetFloatv")
+def _glGetFloatv(l, pname, ptr):
+    return _gl_getv(l, "glGetFloatv", pname, ptr,
+                    _FLOAT_ARITY, ctypes.c_float)
+
+
+@cfunc("_glGetBooleanv")
+def _glGetBooleanv(l, pname, ptr):
+    return _gl_getv(l, "glGetBooleanv", pname, ptr,
+                    _BOOL_ARITY, ctypes.c_ubyte)
 
 
 @cfunc("_glFlush", "_glFinish")
