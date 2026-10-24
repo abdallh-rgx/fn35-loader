@@ -472,12 +472,36 @@ def _pthread_key_delete(l, key):
 
 @cfunc("_pthread_getspecific")
 def _pthread_getspecific(l, key):
-    return l.cur.specific.get(key, 0)
+    v = l.cur.specific.get(key, 0)
+    if v:
+        return v
+    # The engine (libSystem-style code paths) occasionally dereferences
+    # a getspecific() result WITHOUT a null check (e.g. [x0+0xb4] on
+    # key 10). A raw NULL return crashes the boot. Hand back a lazily
+    # allocated ZERO block for this (thread, key): flags read as 0 and
+    # the code falls into its default/no-op path, which matches what a
+    # freshly-initialized-but-inactive subsystem looks like on XNU.
+    try:
+        z = l.cur.tlv_bases.get(("specz", key))
+    except Exception:
+        z = None
+    if z is None:
+        z = l.heap_alloc(0x4000, zero=True)
+        try:
+            l.cur.tlv_bases[("specz", key)] = z
+        except Exception:
+            pass
+    return z
 
 
 @cfunc("_pthread_setspecific")
 def _pthread_setspecific(l, key, val):
     l.cur.specific[key] = val
+    # once set for real, drop the zero-block stand-in
+    try:
+        l.cur.tlv_bases.pop(("specz", key), None)
+    except Exception:
+        pass
     return 0
 
 
