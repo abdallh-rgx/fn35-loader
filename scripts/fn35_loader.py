@@ -961,10 +961,10 @@ class FNLoader:
                                     break
                     except Exception:
                         pass
-                    for regn in (1, 2, 3, 4):
+                    for regn in (1, 2, 3, 4, 19, 20, 21, 22, 23):
                         try:
                             pr_ = self.reg_x(regn)
-                            rawr = self.rdb(pr_, 64) if pr_ > 0x1000 else b""
+                            rawr = self.rdb(pr_, 200) if pr_ > 0x1000 else b""
                             u16r = rawr.decode("utf-16-le", "replace")
                             u16r = u16r.split("\x00")[0]
                             ar = rawr.split(b"\x00")[0].decode(
