@@ -2493,6 +2493,42 @@ class FNLoader:
         self.fds[fd] = entry
         return fd
 
+    def _png_trace(self, fd, buf, data, tag):
+        """PNG read forensics: CRC-check the assembled buffer after every
+        read served for a .png-backed fd."""
+        ent = self.fds.get(fd)
+        if not ent or ent[0] != "file":
+            return
+        host = ent[2]
+        if not isinstance(host, str) or not host.lower().endswith(".png"):
+            return
+        import zlib as _zl
+        import struct as _st
+        try:
+            with open(host, "rb") as _f:
+                whole = _f.read()
+            n = len(data)
+            self._png_parts = getattr(self, "_png_parts", {})
+            info = self._png_parts.setdefault(
+                fd, {"pos": 0, "got": bytearray()})
+            pos = ent[1].tell() - n
+            if pos == info["pos"]:
+                info["got"] += data
+                info["pos"] = pos + n
+            # CRC of the FULL expected file slice we have so far
+            got = bytes(info["got"])
+            msg = "len=%d got=%d" % (len(whole), len(got))
+            if whole.startswith(b"\x89PNG\r\n\x1a\n") and got[:8] == b"\x89PNG\r\n\x1a\n":
+                if got[:33] == whole[:33]:
+                    msg += " IHDR-part-OK"
+                else:
+                    msg += " IHDR-part-DIFFERS!!"
+                    msg += " got=%s" % got[:33].hex()
+            self.console("[png-rd] %s fd=%d buf=0x%x n=%d pos=%d %s"
+                         % (tag, fd, buf, n, pos, msg))
+        except Exception as e:
+            self.console("[png-rd] %s fd=%d log-failed %r" % (tag, fd, e))
+
     def sys_open(self, gpath, flags, mode):
         import os as _os
         host = self.translate_path(gpath)
@@ -2569,6 +2605,7 @@ class FNLoader:
             data = ent[1].read(min(count, 1 << 24))
             if data:
                 self.wrb(buf, data)
+                self._png_trace(fd, buf, data, "read")
             return len(data)
         if ent[0] == "dir":
             return -21
@@ -2602,6 +2639,7 @@ class FNLoader:
             data = ent[1].read(min(count, 1 << 24))
             if data:
                 self.wrb(buf, data)
+                self._png_trace(fd, buf, data, "pread@%d" % offset)
             return len(data)
         return -9
 
