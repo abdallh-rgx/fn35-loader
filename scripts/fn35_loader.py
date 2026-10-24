@@ -221,7 +221,7 @@ class FNLoader:
         self._arity = {}
         self.fault_counts = Counter()
         self.fault_log = deque(maxlen=64)
-        self.stub_ring = deque(maxlen=256)   # last stub calls (diagnostics)
+        self.stub_ring = deque(maxlen=4096)  # last stub calls (diagnostics)
         self.gl_trace = deque(maxlen=512)
         self.objc_trace = deque(maxlen=256)
         self.mach_trace = deque(maxlen=256)
@@ -1461,8 +1461,22 @@ class FNLoader:
                     addr, (nm or "?")[:30], addr - (sa or 0),
                     d[0] if d else "?"))
         if self.stub_ring:
-            self.console("[stubs-before-fault] (last 40)")
-            for ent in list(self.stub_ring)[-40:]:
+            # file/log operations first: they explain WHY the engine died
+            _FILEY = ("_open", "_fopen", "_stat", "_access", "_read",
+                      "_pread", "_lseek", "_close", "_mmap", "_mkdir",
+                      "_unlink", "_rename", "_fcntl", "_dlopen",
+                      "_NSLog", "_printf", "_puts", "_fprintf")
+            ents = list(self.stub_ring)
+            nfo = [e for e in ents if any(f in str(e[0]) for f in _FILEY)]
+            self.console("[stubs-before-fault] (file/log ops, last 80 "
+                         "of %d)" % len(nfo))
+            for ent in nfo[-80:]:
+                nm, aa, thr = ent[0], ent[1], ent[2]
+                extra = (" <<%s>>" % ent[3]) if len(ent) > 3 else ""
+                self.console("  %-38s (%s) %s%s" % (
+                    nm, thr, " ".join("0x%x" % a for a in aa), extra))
+            self.console("[stubs-before-fault] (raw tail 20)")
+            for ent in ents[-20:]:
                 nm, aa, thr = ent[0], ent[1], ent[2]
                 extra = (" <<%s>>" % ent[3]) if len(ent) > 3 else ""
                 self.console("  %-38s (%s) %s%s" % (
