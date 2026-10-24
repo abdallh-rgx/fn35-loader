@@ -855,6 +855,99 @@ class FNLoader:
                 self.console("[patch] %s" % desc)
             except Exception as e:
                 self.console("[patch] FAILED %s: %r" % (desc, e))
+        # dynamic keystone-assembled guards (need a code cave)
+        self.install_weakobj_guard()
+
+    # ---- FWeakObjectPtr poison guard --------------------------------
+    # ObjectIndexToObject() has TWO identical clones
+    #   0x102def93c   (IndexToObject proper)
+    #   0x1028eb2d4   (twin)
+    # both do:  chunk = index/16384 ; within = index%16384
+    #           ldr x9,[x0, w9, sxtw#3]   ; table[chunk]   <- NO BOUNDS CHECK
+    #           ldr x0,[x9, w8, sxtw#3]   ; chunkptr[within]
+    # A garbage index (segBU: 0x6400023b -> chunk 0x190000) reads past
+    # the 128-entry table (0x408-byte alloc), pulls a NULL/heap value
+    # and faults at [NULL + within*8]. UE4's OWN caller already
+    # tolerates NULL results (FWeakObjectPtr::Get: `cbz x21 -> ret 0`),
+    # so returning NULL for poison is the semantically-correct fix.
+    WEAKOBJ_SLOTS = [
+        # (patch_site, return_site, slot_off_in_page)
+        (0x102def960, 0x102def968, 0x00),
+        (0x1028eb2f8, 0x1028eb300, 0x20),
+    ]
+    WEAKOBJ_CAVE = 0x106000000        # free page within +-128MB of sites
+
+    def install_weakobj_guard(self):
+        try:
+            import keystone
+        except ImportError:
+            self.warn("weakobj guard: keystone missing, skipped")
+            return
+        ks = keystone.Ks(keystone.KS_ARCH_ARM64,
+                         keystone.KS_MODE_LITTLE_ENDIAN)
+        CAVE = self.WEAKOBJ_CAVE
+        try:
+            self.uc.mem_map(CAVE, 0x1000, 7)   # RWX
+        except UcError:
+            pass  # already mapped (snapshot resume) -- slots rewritten below
+        ok = 0
+        for site, retsite, off in self.WEAKOBJ_SLOTS:
+            try:
+                s0 = CAVE + off
+                poison = s0 + 0x18
+                done = s0 + 0x1c
+                asm = ("cmp w9, #0x80\n"          # chunk >= 128?
+                       "b.hs 0x%x\n"              # -> poison
+                       "ldr x9, [x0, w9, uxtw #3]\n"
+                       "cbz x9, 0x%x\n"            # NULL chunk -> poison
+                       "ldr x0, [x9, w8, uxtw #3]\n"
+                       "b 0x%x\n"                  # -> done
+                       "mov x0, xzr\n"             # poison:
+                       "b 0x%x\n"                  # done: back to caller
+                       % (poison, poison, done, retsite))
+                enc, _ = ks.asm(asm, addr=s0)
+                body = bytes(enc)
+                if len(body) != 0x20:
+                    raise RuntimeError("cave slot %d is %d bytes"
+                                       % (off, len(body)))
+                self.wrb(s0, body)
+                # redirect: replace the two unchecked loads with b cave
+                red, _ = ks.asm("b 0x%x" % s0, addr=site)
+                self.wrb(site, bytes(red))
+                # TB invalidation (page-wide -- TBs span functions)
+                self.uc.ctl_remove_cache(site & ~0xFFF,
+                                          (site & ~0xFFF) + 0x1000)
+                # poison-path instrumentation hook
+                try:
+                    self.uc.hook_add(UC_HOOK_CODE,
+                                     self._weakobj_poison_hit,
+                                     begin=poison, end=poison)
+                except Exception:
+                    pass
+                ok += 1
+            except Exception as e:
+                self.console("[weak-guard] slot @0x%x FAILED: %r"
+                             % (site, e))
+        self.uc.ctl_remove_cache(CAVE, CAVE + 0x1000)
+        self.console("[weak-guard] %d/%d ObjectIndexToObject caves armed"
+                     % (ok, len(self.WEAKOBJ_SLOTS)))
+
+    def _weakobj_poison_hit(self, uc, addr, size, user):
+        self._weak_poison_n = getattr(self, "_weak_poison_n", 0) + 1
+        n = self._weak_poison_n
+        if n <= 12 or n % 500 == 0:
+            try:
+                x19 = uc.reg_read(XREGS[19])
+                idx = self.rd32(x19)
+                ser = self.rd32(x19 + 4)
+                t = self.cur
+                self.console("[weak-guard] poison #%d idx=0x%x "
+                             "serial=0x%x thr=%s"
+                             % (n, idx, ser,
+                                getattr(t, "name", "?")))
+            except Exception as e:
+                self.console("[weak-guard] hit #%d (log failed %r)"
+                             % (n, e))
 
     def install_hooks(self):
         self.uc.hook_add(UC_HOOK_INTR, self.hook_intr)
