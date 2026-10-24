@@ -2116,6 +2116,17 @@ class FNLoader:
         while True:
             if self.fatal_msg or self.exit_code is not None:
                 break
+            # wake past-due timed waiters EVERY iteration: advance_clock
+            # only runs in the idle path (pick_ready == None), so a CPU-
+            # hogging ready thread (e.g. MainAppThread spin-waiting for
+            # task workers) starves every pthread_cond_timedwait sleeper
+            # forever -- their wake deadlines pass but nothing re-readies
+            # them. This was the segBX/BZ "silent phase" killer.
+            for _t in self.threads.values():
+                if _t.state == "blocked" and _t.wake_ns \
+                        and _t.wake_ns <= self.vclock:
+                    _t.state = "ready"
+                    _t.wait = None
             if time.time() - self.t_start > self.budget:
                 # snapshot safety: never stop with pending python
                 # continuations on the stack (they are generators that
