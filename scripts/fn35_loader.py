@@ -2526,6 +2526,35 @@ class FNLoader:
                     msg += " got=%s" % got[:33].hex()
             self.console("[png-rd] %s fd=%d buf=0x%x n=%d pos=%d %s"
                          % (tag, fd, buf, n, pos, msg))
+            # full file delivered: arm a write-watchpoint on the guest
+            # buffer to catch whoever stomps it before libpng checks CRC
+            if len(got) >= len(whole) and whole[:8] == b"\x89PNG\r\n\x1a\n" \
+                    and n and len(whole) >= 33 and got[:33] == whole[:33] \
+                    and not getattr(self, "_png_watch_armed", False):
+                self._png_watch_armed = True
+                self._png_watch_buf = buf
+                self._png_watch_end = buf + len(got)
+                self._png_watch_hits = 0
+                try:
+                    from unicorn import UC_HOOK_MEM_WRITE
+                    def _wp(uc, access, address, size, value, user):
+                        self._png_watch_hits += 1
+                        if self._png_watch_hits <= 14:
+                            pc = self.reg_pc()
+                            nm, sa = self.nearest_symbol(pc)
+                            d = self.rdb(address, min(size, 16))
+                            self.console("[png-STOMP] #%d addr=0x%x size=%d "
+                                         "val=%r pc=0x%x (%s+0x%x)"
+                                         % (self._png_watch_hits, address,
+                                            size, d[:16], pc,
+                                            (nm or "?")[:40],
+                                            pc - (sa or 0)))
+                    self.uc.hook_add(UC_HOOK_MEM_WRITE, _wp,
+                                     begin=buf, end=buf + len(got))
+                    self.console("[png-watch] armed on [0x%x..0x%x)"
+                                 % (buf, buf + len(got)))
+                except Exception as e:
+                    self.console("[png-watch] arm failed %r" % (e,))
         except Exception as e:
             self.console("[png-rd] %s fd=%d log-failed %r" % (tag, fd, e))
 
