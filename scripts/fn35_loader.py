@@ -1812,6 +1812,40 @@ class FNLoader:
                     self.fatal_msg = ("main thread null-call at lr=0x%x "
                                      "(%s+0x%x)" % (lr, nm or "?",
                                                     lr - (sa or 0)))
+                    # --- crash forensics: AAPCS frame-chain walk ------
+                    # lr is often already clobbered by the time we get
+                    # here; the x29 chain (frame layout [x29]=saved fp,
+                    # [x29+8]=return addr) survives and gives the caller.
+                    try:
+                        fp = (t.regs or {}).get(
+                            a64.UC_ARM64_REG_X29, 0) or \
+                            (t.regs or {}).get(a64.UC_ARM64_REG_FP, 0)
+                        sp = (t.regs or {}).get(a64.UC_ARM64_REG_SP, 0)
+                        xs = " ".join(
+                            "x%d=0x%x" % (i, (t.regs or {}).get(r, 0))
+                            for i, r in enumerate(XREGS[:9]))
+                        self.console("[main-dead] %s sp=0x%x fp=0x%x"
+                                     % (xs, sp, fp))
+                        seen = set()
+                        nfr = 0
+                        while fp and sp - 0x400000 < fp < sp + 0x400000 \
+                                and nfr < 24 and fp not in seen:
+                            seen.add(fp)
+                            try:
+                                nxt = self.rd64(fp)
+                                ret = self.rd64(fp + 8)
+                            except Exception:
+                                break
+                            fn, fs = self.nearest_symbol(ret)
+                            self.console("[bt %2d] 0x%x %s+0x%x"
+                                         % (nfr, ret, (fn or "?")[:48],
+                                            ret - (fs or 0)))
+                            nfr += 1
+                            if nxt <= fp:
+                                break
+                            fp = nxt
+                    except Exception as e:
+                        self.console("[main-dead] bt failed: %r" % (e,))
                     break
                 self.thread_done(t)
                 continue
