@@ -1148,24 +1148,18 @@ class FNLoader:
 
     def arm_lastmile_trace(self, n=1_500_000):
         """Bounded per-instruction ring, armed at a console milestone.
-        When a fault hits, the last instructions are disassembled to
-        reveal the exact branch that went wrong. The full TB cache is
-        flushed on arming: blocks translated BEFORE the hook existed
-        would otherwise execute without firing it (the ring would lie
-        by omission -- exactly what hid the segBN crash site)."""
+        The TB flush is DEFERRED to the scheduler (between slices):
+        ctl_remove_cache called mid-emulation does NOT invalidate
+        already-chained blocks (the segBQ/BR rings kept lying by
+        omission until this was fixed)."""
         from unicorn import UC_HOOK_CODE
         try:
             self._lm_ring = deque(maxlen=n)
             self._lm_hook = self.uc.hook_add(
                 UC_HOOK_CODE, self._lm_hook_fn)
-            try:
-                # flush every cached TB so all future blocks are
-                # translated WITH the trace hook compiled in
-                self.uc.ctl_remove_cache(1, 0xFFFFFFF00000)
-            except Exception:
-                pass
+            self._lm_flush_pending = True
             self.console("[lm-trace] armed ring of %d instructions "
-                         "(TB cache flushed)" % n)
+                         "(TB flush deferred to next slice boundary)" % n)
         except Exception as e:
             self.console("[lm-trace] arm failed: %r" % (e,))
 
@@ -1227,6 +1221,12 @@ class FNLoader:
             except Exception:
                 lr = 0
             self.console("[null-call] PC=0 caught live: lr=0x%x" % lr)
+            try:
+                thr = self.cur.name if self.cur else "?"
+                tid = getattr(self.cur, "tid", 0) if self.cur else 0
+                self.console("[null-call] thread=%r tid=0x%x" % (thr, tid))
+            except Exception:
+                pass
             try:
                 sp = self.uc.reg_read(a64.UC_ARM64_REG_SP)
                 self.console("[null-call] sp=0x%x (ZERO-STACK!)"
@@ -2044,6 +2044,14 @@ class FNLoader:
                 self.fatal("hook exception %r (pc=0x%x)" % (e, self.reg_pc()))
                 break
             self.save_thread(t)
+            # deferred TB flush (armed mid-emulation): safe between slices
+            if getattr(self, "_lm_flush_pending", False):
+                self._lm_flush_pending = False
+                try:
+                    self.uc.ctl_remove_cache(1, 0xFFFFFFF00000)
+                    self.console("[lm-trace] TB cache flushed")
+                except Exception as e:
+                    self.console("[lm-trace] flush failed: %r" % (e,))
             if not t.pc:
                 # NULL function-pointer call (blr xzr / stored NULL):
                 # unicorn no-ops an emu_start(0, 0) slice, so without

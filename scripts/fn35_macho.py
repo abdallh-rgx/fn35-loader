@@ -298,7 +298,10 @@ class MachO:
         return lo, hi - lo
 
     def parse_binds(self):
-        """Interpret dyld bind/weak-bind opcode streams -> [BindRecord]."""
+        """Interpret dyld bind/weak-bind/lazy-bind opcode streams ->
+        [BindRecord]. The lazy stream matters: its GOT slots otherwise
+        stay NULL (real dyld resolves them on first call) and every
+        `ldr x16,[GOT]; br x16` through one jumps to 0."""
         recs = []
         if self.bind_size:
             recs += self._parse_bind_stream(self.bind_off, self.bind_size,
@@ -306,6 +309,9 @@ class MachO:
         if self.weak_size:
             recs += self._parse_bind_stream(self.weak_off, self.weak_size,
                                             True)
+        if self.lazy_size:
+            recs += self._parse_bind_stream(self.lazy_off, self.lazy_size,
+                                            False)
         return recs
 
     def _parse_bind_stream(self, off, size, weak):
