@@ -1,2 +1,16 @@
 skills/
 node_modules/
+fn35/*.ipa
+fn35/*.log
+fn35/snap/
+fn35/pakcache/
+fn35/tools/
+fn35/tools.zip
+fn35/aes-archive/
+fn35/extracted/
+fn35/mfpage.html
+fn35/sandbox/
+download/
+db/
+*.pyc
+__pycache__/
