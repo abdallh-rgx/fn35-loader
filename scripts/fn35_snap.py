@@ -238,16 +238,40 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
     l.prepare()
 
     # --- overlay memory: reproduce exactly the saved region map ---
+    # PERF FIX 2025-10-25: the old loop unmap_intersecting() per region
+    # cost O(regions^2) (mem_regions() rebuilds the full list each call)
+    # -- 4125 farm/stack 4KB pages took ~355s to restore. Instead:
+    # (1) snapshot the CURRENT map once and unmap everything,
+    # (2) merge adjacent same-perm saved regions (4125 -> ~9!),
+    # (3) bulk mem_map, then write chunks with original bounds.
     restored = 0
+    _cur = list(l.uc.mem_regions())
+    for _r in _cur:
+        try:
+            l.uc.mem_unmap(_r[0], _r[1] - _r[0] + 1)
+        except Exception:
+            pass
+    _saved = sorted(((r["begin"], r["end"], r["perms"])
+                     for r in meta["regions"]), key=lambda x: x[0])
+    _merged = []
+    for _b, _e, _p in _saved:
+        if _merged and _merged[-1][1] + 1 == _b and _merged[-1][2] == _p:
+            _merged[-1][1] = _e
+        else:
+            _merged.append([_b, _e, _p])
+    _map_fail = 0
+    for _b, _e, _p in _merged:
+        try:
+            l.uc.mem_map(_b, _e - _b + 1, _p)
+        except Exception as ex:
+            _map_fail += 1
+            l.console("[snap] mem_map(0x%x, 0x%x) failed: %r"
+                      % (_b, _e - _b + 1, ex))
+    if _map_fail:
+        l.console("[snap] WARNING: %d merged map failures" % _map_fail)
     for r in meta["regions"]:
         b, e, perms = r["begin"], r["end"], r["perms"]
         size = e - b + 1
-        _unmap_intersecting(l.uc, b, e)
-        try:
-            l.uc.mem_map(b, size, perms)
-        except Exception as ex:
-            l.console("[snap] mem_map(0x%x, 0x%x) failed: %r" % (b, size, ex))
-            continue
         if r["file"]:
             path = os.path.join(snapdir, r["file"])
             csz = r["chunksz"]
