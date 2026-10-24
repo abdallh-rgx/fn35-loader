@@ -823,7 +823,13 @@ class FNLoader:
         # caller ignores the return value). Patch its first instruction
         # to `ret` -- verification becomes a no-op for BOTH internal
         # loops and BOTH "Missing global shader" fatal logs.
-        (0x1023575d4, b"\xc0\x03\x9f\xd6",
+        # FIX 2025-10-25: the original bytes c0 03 9f d6 are RETAA
+        # (return w/ pointer-auth). Unicorn 2.1.4 CANNOT execute RETAA:
+        # it wipes SP to 0 and does a fetch at PC=0 (verified in
+        # isolation: MEM_INVALID access=21 addr=0x0 pc=0x0, sp=0).
+        # Plain RET = c0 03 5f d6. The patch never executed until the
+        # weakobj guard let the engine reach this call path (segBV).
+        (0x1023575d4, b"\xc0\x03\x5f\xd6",
          "global-shader verify function -> immediate ret (no-op)"),
         # Belt & suspenders: the assert helper used by surrounding code
         # (0x10136d04c, fmt "Assertion failed: %s [File:%s] [Line: %i]")
