@@ -2303,6 +2303,17 @@ def _nslog(l, fmt, *va):
             except Exception:
                 continue
     l.console("[NSLog] %s" % out)
+    # ---- trigger the last-mile instruction trace -------------------
+    # the PC=0/sp=0 null-call happens shortly after this warning;
+    # arm a bounded instruction ring so the fault dump shows the
+    # exact branch that went to NULL.
+    try:
+        if "Failed to open default shader pipeline cache" in out \
+                and not getattr(l, "_trace_armed", False):
+            l._trace_armed = True
+            l.arm_lastmile_trace(1_500_000)
+    except Exception:
+        pass
     return 0
 
 
