@@ -1107,6 +1107,20 @@ def _abort_fn(l):
                % (lr, name or "?", lr - (saddr or 0)))
     for ent in list(l.stub_ring)[-12:]:
         l.console("   %s" % (ent,))
+    # file/log ops leading here explain WHY the engine gave up
+    try:
+        _FILEY = ("_open", "_fopen", "_stat", "_access", "_read",
+                  "_pread", "_lseek", "_close", "_mkdir", "_unlink",
+                  "_rename", "_fcntl", "_dlopen", "_NSLog", "_printf",
+                  "_puts", "_fprintf", "_opendir", "_readdir")
+        ents = list(l.stub_ring)
+        nfo = [e for e in ents if any(f in str(e[0]) for f in _FILEY)]
+        l.console("[abort] file/log ops before exit (last 60 of %d):"
+                  % len(nfo))
+        for ent in nfo[-60:]:
+            l.console("   %s" % (ent,))
+    except Exception:
+        pass
     # full frame-pointer backtrace: WHO led to this abort?
     try:
         from unicorn.arm64_const import UC_ARM64_REG_X29, UC_ARM64_REG_SP
