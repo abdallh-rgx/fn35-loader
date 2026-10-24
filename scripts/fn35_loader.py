@@ -2503,6 +2503,27 @@ class FNLoader:
             mk = self.pakfs.materialize(gpath)
             if mk is not None:
                 host = mk
+        # PNG forensics: log every served PNG + verify its header CRC
+        if gpath and gpath.lower().endswith(".png"):
+            try:
+                with open(host, "rb") as _f:
+                    _d = _f.read(40)
+                if _d[:8] == b"\x89PNG\r\n\x1a\n":
+                    import struct as _st
+                    import zlib as _zl
+                    _ln = _st.unpack(">I", _d[8:12])[0]
+                    _crc_ok = (_d[12:16] == b"IHDR" and
+                               _st.unpack(">I", _d[16 + _ln:20 + _ln])[0]
+                               == _zl.crc32(_d[12:16 + _ln]) & 0xFFFFFFFF)
+                    self.console("[png-open] %s -> %s IHDR-CRC=%s"
+                                 % (gpath, host.split("fn35/")[-1],
+                                    "OK" if _crc_ok else "BAD!"))
+                else:
+                    self.console("[png-open] %s -> %s NOT-A-PNG!"
+                                 % (gpath, host.split("fn35/")[-1]))
+            except Exception as _e:
+                self.console("[png-open] %s verify failed %r"
+                             % (gpath, _e))
         acc = flags & 3
         o_creat = flags & 0x200
         o_trunc = flags & 0x400
