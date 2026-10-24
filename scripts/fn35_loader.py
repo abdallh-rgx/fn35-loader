@@ -297,11 +297,38 @@ class FNLoader:
     def console(self, msg):
         line = str(msg).rstrip()
         self.ring.append(line)
+        self._last_console_wall = time.time()
         if self.live_log:
             try:
                 print(line, flush=True)
             except Exception:
                 pass
+
+    def heartbeat(self):
+        """Silent-phase watchdog: when nothing logs for 60s, print one
+        line showing what the scheduler is actually doing (thread + pc
+        symbol + counters). Pure-CPU guest loops (zlib inflate, hashing)
+        otherwise look exactly like a hang."""
+        now = time.time()
+        last = getattr(self, "_last_console_wall", None)
+        if last is None:
+            self._last_console_wall = now
+            return
+        if now - last < 60.0:
+            return
+        self._last_console_wall = now   # fire at most once per 60s
+        t = self.cur
+        if t is not None:
+            pc = t.pc
+            nm, sa = self.nearest_symbol(pc)
+            self.console("[hb] silent 60s: thr=%r tid=0x%x pc=0x%x (%s+0x%x) "
+                         "instr~%dM threads=%d"
+                         % (t.name, t.tid, pc, (nm or "?")[:44],
+                            pc - (sa or 0), t.approx_instr // 1000000,
+                            self.thread_count()))
+        else:
+            self.console("[hb] silent 60s: idle scheduler threads=%d"
+                         % self.thread_count())
 
     def warn(self, msg):
         self.console("[warn] " + str(msg))
@@ -2138,6 +2165,7 @@ class FNLoader:
             self.restore_thread(t)
             self.stop_reason = None
             wall0 = time.time()
+            self.heartbeat()
             try:
                 # until=1 (never reached): a PC=0 branch must FAULT so
                 # on_fetch() can capture the caller live instead of the
