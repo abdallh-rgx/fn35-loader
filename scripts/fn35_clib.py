@@ -847,14 +847,48 @@ def _fputc(l, c, fp):
     return c
 
 
-@cfunc("_fgetc", "_getc", "_getchar")
-def _fgetc(l, a=0):
+@cfunc("_fgetc", "_getc")
+def _fgetc(l, fp):
+    """int fgetc(FILE*) -- one byte or EOF. The engine parses text
+    files (ue4commandline.txt!) byte-wise."""
+    fd = (fp - 0x1000) if fp and fp > 0x1000 else 0
+    ent = l.fds.get(fd) if fd else None
+    if not ent or ent[0] != "file":
+        return -1
+    try:
+        c = ent[1].read(1)
+    except Exception:
+        return -1
+    return c[0] if c else -1
+
+
+@cfunc("_getchar")
+def _getchar(l):
     return -1
+
+
+def _stdio_line(l, fp, n):
+    """shared fgets core: read up to n-1 bytes stopping after newline"""
+    if n <= 0 or not fp:
+        return None
+    fd = (fp - 0x1000) if fp > 0x1000 else 0
+    ent = l.fds.get(fd) if fd else None
+    if not ent or ent[0] != "file":
+        return None
+    try:
+        line = ent[1].readline(n - 1)
+    except Exception:
+        return None
+    return line if line else None
 
 
 @cfunc("_fgets")
 def _fgets(l, buf, n, fp):
-    return 0
+    line = _stdio_line(l, fp, n)
+    if line is None:
+        return 0
+    l.wrb(buf, line[:n - 1] + b"\x00")
+    return buf
 
 
 @cfunc("_NSLog", "__NSLog", "_CFLog")

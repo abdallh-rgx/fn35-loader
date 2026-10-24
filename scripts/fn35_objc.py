@@ -199,6 +199,20 @@ class ObjCRuntime:
         return obj
 
     # ---------------- method resolution ------------------------------
+    def super_of(self, cls_addr):
+        """Class-struct super pointer, LIVE (post-link). The binary
+        __objc_data class structs get their super pointers bound by
+        link() AFTER boot() parsed them, so the cached bc.super can be
+        stale/zero for classes whose super is an external (ghost) class."""
+        bc = self.classes.get(cls_addr)
+        if bc is not None and bc.super:
+            return bc.super
+        l = self.l
+        try:
+            return l.rd64(cls_addr + 8)
+        except Exception:
+            return 0
+
     def resolve(self, recv, selname):
         """Return ("imp", addr) | ("py", fn, owner) | None."""
         l = self.l
@@ -220,7 +234,7 @@ class ObjCRuntime:
                     break
                 if selname in bc.methods:
                     return ("imp", bc.methods[selname])
-                nxt = bc.super
+                nxt = self.super_of(cls)
                 if not nxt:
                     break
                 if nxt and nxt not in self.classes and mo_in(self.l, nxt):
@@ -250,7 +264,65 @@ class ObjCRuntime:
                 break
             if selname in bc.methods:
                 return ("imp", bc.methods[selname])
-            cls = bc.super
+            cls = self.super_of(cls)
+            depth += 1
+        return None
+
+    def resolve_super(self, recv, start_cls, selname):
+        """objc_msgSendSuper2 semantics: the search starts at the
+        SUPERCLASS of the class in the super struct. Never re-dispatch
+        the method that called us (that would recurse forever)."""
+        l = self.l
+        sup_cls = 0
+        # live class struct: {isa, super, ...} -- post-link truth
+        if start_cls:
+            try:
+                sup_cls = l.rd64(start_cls + 8)
+            except Exception:
+                sup_cls = 0
+        if not sup_cls:
+            bc = self.classes.get(start_cls) if start_cls else None
+            sup_cls = bc.super if bc else 0
+        if not sup_cls:
+            gname = self.ghost_by_addr.get(start_cls) if start_cls else None
+            if gname:
+                return self._ghost_lookup(self.ghost_super_of(gname),
+                                          selname)
+            return self.resolve(recv, selname)
+        gname = self.ghost_by_addr.get(sup_cls)
+        if gname:
+            return self._ghost_lookup(gname, selname)
+        # walk binary chain starting at the superclass
+        cls = sup_cls
+        depth = 0
+        while cls and depth < 16:
+            bc = self.classes.get(cls)
+            if bc is None:
+                gname = self.ghost_by_addr.get(cls)
+                if gname:
+                    return self._ghost_lookup(gname, selname)
+                try:
+                    nxt = l.rd64(cls + 8)
+                except Exception:
+                    break
+                if nxt == start_cls or not nxt:
+                    break
+                cls = nxt
+                depth += 1
+                continue
+            if selname in bc.methods:
+                return ("imp", bc.methods[selname])
+            nxt = bc.super
+            if not nxt:
+                try:
+                    nxt = l.rd64(cls + 8)
+                except Exception:
+                    break
+            if not nxt or nxt == start_cls:
+                break
+            if nxt not in self.classes and mo_in(l, nxt):
+                self.parse_class(nxt)
+            cls = nxt
             depth += 1
         return None
 
@@ -1258,10 +1330,34 @@ def _mk_uikit_tables():
     }
 
     def _v_bounds(l, r, a):
-        _rect_out(l, l.reg_x(8), 0, 0, SCREEN_W, SCREEN_H)
+        g = l.objc.objects.get(r)
+        fr = g.fields.get("frame") if g is not None else None
+        if fr and len(fr) == 4:
+            x, y, w, h = fr
+        else:
+            x, y, w, h = 0, 0, SCREEN_W, SCREEN_H
+        _rect_out(l, l.reg_x(8), x, y, w, h)
         return 0
     viewT["bounds"] = _v_bounds
     viewT["frame"] = _v_bounds
+
+    def _ui_initwithframe(l, r, a):
+        # [UIView initWithFrame:(CGRect)frame] -- CGRect arrives in
+        # v0..v3 (arm64 AAPCS). Store it so later bounds/frame reads
+        # can return the true geometry, then return self: the ObjC
+        # convention that makes every -init chain succeed.
+        try:
+            fr = (l.reg_d(0), l.reg_d(1), l.reg_d(2), l.reg_d(3))
+            if not (fr[2] > 0.5 and fr[3] > 0.5):
+                fr = (fr[0], fr[1], float(SCREEN_W), float(SCREEN_H))
+        except Exception:
+            fr = (0.0, 0.0, float(SCREEN_W), float(SCREEN_H))
+        g = l.objc.objects.get(r)
+        if g is not None:
+            g.fields["frame"] = fr
+        return r
+    viewT["initWithFrame:"] = _ui_initwithframe
+    viewT["initWithCoder:"] = lambda l, r, a: r
     G["UIView"] = viewT
     C["UIView"] = {"layerClass": lambda l, r, a: l.objc.ghost(
         "CAEAGLLayer"), "class": lambda l, r, a: r}
@@ -1923,10 +2019,31 @@ def _objc_msgsend(l, recv, sel, *rest):
 @cfunc("_objc_msgSendSuper2", "_objc_msgSendSuper_stret")
 def _objc_msgsend_super(l, sup, sel, *rest):
     rt = l.objc
-    recv = l.rd64(sup) if sup else 0
-    if not recv:
+    if not sup:
         return 0
-    return _objc_msgsend(l, recv, sel, *rest)
+    recv = l.rd64(sup) if sup else 0
+    start_cls = 0
+    try:
+        start_cls = l.rd64(sup + 8)
+    except Exception:
+        start_cls = 0
+    name = rt.sel_name_of(sel)
+    if not recv or name is None:
+        return 0
+    r = rt.resolve_super(recv, start_cls, name)
+    import os as _o
+    if _o.environ.get("FN35_TRACE_MSG"):
+        l.trace_objc("[super %s @0x%x cls=0x%x]" % (name, recv, start_cls))
+    if r is None:
+        l.trace_objc("?? super [0x%x %s cls=0x%x]" % (recv, name, start_cls))
+        return 0
+    if r[0] == "imp":
+        return ("pc", r[1])
+    try:
+        return r[1](l, recv, list(rest))
+    except Exception as e:
+        l.warn("objc super [%s @%s]: %r" % (name, r[2], e))
+        return 0
 
 
 @cfunc("_objc_getClass", "_objc_lookUpClass", "_objc_getRequiredClass")

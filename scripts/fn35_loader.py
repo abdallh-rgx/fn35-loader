@@ -104,7 +104,7 @@ class EmuThread:
     __slots__ = ("tid", "name", "stack_base", "stack_size", "regs", "pc",
                  "state", "wait", "wake_ns", "extra", "retval",
                  "approx_instr", "errno_cell", "specific", "tlv_bases",
-                 "created_at")
+                 "created_at", "eagl_ctx")
 
     def __init__(self, tid, name, stack_base, stack_size):
         self.tid = tid
@@ -645,7 +645,9 @@ class FNLoader:
                        or sym.endswith("2idE"))   # std locale facet ids
             if is_data:
                 # real zero storage: C++ static guards, rune tables, ids
-                val = self.data_cell("d." + sym, 256)
+                val = self.data_cell("d." + sym,
+                                     1024 if sym == "__DefaultRuneLocale"
+                                     else 256)
             else:
                 val = self.get_stub(sym)
             try:
@@ -894,14 +896,15 @@ class FNLoader:
             try:
                 p = self.reg_x(0)
                 if p > 0x1000:
-                    raw = self.rdb(p, 48)
+                    raw = self.rdb(p, int(os.environ.get("FN35_WATCH_STRLEN",
+                                                         "48")))
                     # try utf16
                     try:
                         u16 = raw.decode("utf-16-le", "ignore").split("\x00")[0]
                     except Exception:
                         u16 = "?"
                     a = raw.split(b"\x00")[0].decode("utf-8", "replace")
-                    extra = " [x0.u16=%r x0.ansi=%r]" % (u16[:24], a[:24])
+                    extra = " [x0.u16=%r x0.ansi=%r]" % (u16[:100], a[:100])
                     try:
                         # FString at x0: data ptr + count?
                         dp = self.rd64(p)
@@ -1106,6 +1109,17 @@ class FNLoader:
             self.phase = "main"
             self.console("[dyld] all %d module initializers returned"
                          % len(self.inits))
+            # ---- CVar overrides (statics registered during mod-init) ----
+            # Fortnite 3.5 ships rhi.Apple.OpenGLDisabled=1 (Metal-only).
+            # Under emulation we run the OpenGL ES RHI: re-enable it and
+            # make sure Metal stays off.
+            try:
+                self.w32(0x1057EC53C, 0)      # rhi.Apple.OpenGLDisabled
+                self.w32(0x1042B2BB0, 0)       # rhi.Apple.UseMetal
+                self.console("[dyld] cvar rhi.Apple.OpenGLDisabled=0, "
+                             "rhi.Apple.UseMetal=0")
+            except Exception as e:
+                self.console("[dyld] cvar patch failed: %r" % (e,))
             self.setup_call(self.main_addr, self.main_args, MAGIC_INIT_RET)
             self.console("[dyld] entering main() at 0x%x argc=%d"
                          % (self.main_addr, self.main_args[0]))
@@ -1516,6 +1530,52 @@ class FNLoader:
 
         # link image
         n_slots, n_binds = self.link()
+        # ---- populate __DefaultRuneLocale (Darwin rune table) ---------
+        # The engine's iswspace/iswalpha/... read __runetype[c] directly
+        # from this imported data symbol (e.g. FParse::Param's token
+        # boundaries!). Zero storage = "-es2" never parses as a switch.
+        rl = self.data_cells.get("d.__DefaultRuneLocale")
+        if rl:
+            _A, _C, _D, _G = 0x100, 0x200, 0x400, 0x800
+            _L, _P, _S, _U = 0x1000, 0x2000, 0x4000, 0x8000
+            _X, _B, _R = 0x10000, 0x20000, 0x40000
+            rt = []
+            for c in range(0x80):
+                if c < 0x20:
+                    v = _C
+                    if c in (9, 10, 11, 12, 13):
+                        v |= _S
+                    if c == 9:
+                        v |= _B
+                elif c == 0x20:
+                    v = _S | _B | _R
+                elif c < 0x30:
+                    v = _P | _G | _R
+                elif c <= 0x39:                       # digits
+                    v = _D | _G | _X | _R
+                elif c < 0x41:
+                    v = _P | _G | _R
+                elif c <= 0x46:                        # A-F
+                    v = _A | _U | _G | _X | _R
+                elif c <= 0x5A:                        # G-Z
+                    v = _A | _U | _G | _R
+                elif c < 0x61:
+                    v = _P | _G | _R
+                elif c <= 0x66:                        # a-f
+                    v = _A | _L | _G | _X | _R
+                elif c <= 0x7A:                        # g-z
+                    v = _A | _L | _G | _R
+                elif c < 0x7F:
+                    v = _P | _G | _R
+                else:                                   # DEL
+                    v = _C
+                rt.append(v)
+            # _RuneLocale.__runetype lives at +0x3c in this build's
+            # __DefaultRuneLocale consumers (verified in disasm)
+            self.w64(rl, int.from_bytes(b"RuneMagi", "little"))
+            for c in range(0x80):
+                self.w32(rl + 0x3c + 4 * c, rt[c])
+            self.console("[dyld] rune table populated (128 entries)")
         # forward all GL imports to the Mesa bridge
         n_gl = fn35_gles.register_gl()
         self.console("[gl] %d GL imports bridged to Mesa/llvmpipe" % n_gl)
@@ -1643,6 +1703,12 @@ class FNLoader:
             if self.fatal_msg or self.exit_code is not None:
                 break
             if time.time() - self.t_start > self.budget:
+                # snapshot safety: never stop with pending python
+                # continuations on the stack (they are generators that
+                # cannot be serialized). Give them 60s to drain.
+                if self.py_stack and \
+                        time.time() - self.t_start < self.budget + 60.0:
+                    continue
                 self.stop_reason = "budget"
                 break
             t = self.pick_ready()
@@ -1695,6 +1761,18 @@ class FNLoader:
                 self.fatal("hook exception %r (pc=0x%x)" % (e, self.reg_pc()))
                 break
             self.save_thread(t)
+            if not t.pc:
+                # NULL function-pointer call (blr xzr / stored NULL):
+                # unicorn no-ops an emu_start(0, 0) slice, so without
+                # this check the thread spins forever doing nothing.
+                lr = (t.regs or {}).get(a64.UC_ARM64_REG_LR, 0)
+                nm, sa = self.nearest_symbol(lr)
+                self.console("[null-call] %r hit PC=0 (caller lr=0x%x "
+                             "%s+0x%x) -- retiring"
+                             % (t.name, lr, (nm or "?")[:40],
+                                lr - (sa or 0)))
+                self.thread_done(t)
+                continue
             t.approx_instr += self.slice_instr
             # wall-paced virtual clock: a slice advances virtual time by
             # exactly what it cost in real time (min 0.1 ms)
@@ -2015,22 +2093,19 @@ class FNLoader:
             names = _os.listdir(host)
         except OSError:
             return -2
-        # sequential iterator stored on the entry
-        it = ent[2] if len(ent) > 2 else None
-        if it is None:
-            it = iter(names)
-            self.fds[fd] = ("dir", host, it)
+        # picklable cursor (snapshot-safe): (names, next_index)
+        lst = ent[2] if len(ent) > 2 else None
+        idx = ent[3] if len(ent) > 3 else 0
+        if lst is None:
+            lst = names
+            idx = 0
         total = 0
-        while True:
-            try:
-                nm = next(it)
-            except StopIteration:
-                break
+        while idx < len(lst):
+            nm = lst[idx]
             reclen = (21 + len(nm) + 1 + 7) & ~7
             if total + reclen > buflen:
-                # push back
-                self.fds[fd] = ("dir", host, iter([nm] + list(it)))
                 break
+            idx += 1
             rec = bytearray(reclen)
             struct.pack_into("<Q", rec, 0, 4)
             struct.pack_into("<Q", rec, 8, 0)
@@ -2040,6 +2115,7 @@ class FNLoader:
             rec[21:21 + len(nm)] = nm.encode()
             self.wrb(buf + total, bytes(rec))
             total += reclen
+        self.fds[fd] = ("dir", host, lst, idx)
         if basep:
             self.w64(basep, 0)
         return total if total else 0
@@ -2514,7 +2590,8 @@ def _opendir_fn(l, path):
     except OSError:
         return 0
     buf = l.heap_alloc(DIRENT_SIZE + 16, zero=True)
-    l.dir_handles[buf] = {"host": host, "iter": iter(names), "seq": 0}
+    l.dir_handles[buf] = {"host": host, "names": names, "idx": 0,
+                          "seq": 0}
     return buf
 
 
@@ -2528,10 +2605,10 @@ def _readdir_fn(l, d):
         h["dbg"] = h.get("dbg", 0) + 1
         l.console("[readdir#%d] dir=%r" % (h["dbg"], h["host"]))
     while True:
-        try:
-            nm = next(h["iter"])
-        except StopIteration:
+        if h["idx"] >= len(h["names"]):
             return 0
+        nm = h["names"][h["idx"]]
+        h["idx"] += 1
         if nm in (".", ".."):
             continue
         full = _os.path.join(h["host"], nm)
@@ -2709,6 +2786,8 @@ def main():
     budget = float(os.environ.get("FN35_BUDGET", "90"))
     trace_n = int(os.environ.get("FN35_TRACE", "0"))
     live = os.environ.get("FN35_QUIET", "") == ""
+    snapdir = os.environ.get("FN35_SNAPSHOT", "")
+    resume = False
 
     if not os.path.isfile(macho_path):
         print("missing executable: %s" % macho_path)
@@ -2738,20 +2817,49 @@ def main():
     except Exception as e:
         print("[fn35] commandline patch failed: %r" % (e,))
 
-    l = FNLoader(macho_path, sandbox, budget=budget, trace_n=trace_n,
-                 live_log=live)
-    print("[fn35] integrated loader starting")
-    print("[fn35] mach-o: %s" % macho_path)
-    print("[fn35] cryptid=%d (0 = decrypted, good)"
-          % l.macho.cryptid)
-    try:
-        l.prepare()
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print("[fn35] prepare failed: %r" % e)
-        return 1
+    if snapdir and os.path.isfile(os.path.join(snapdir, "index.json")):
+        # ---- resume from snapshot (chained segment) ----
+        import fn35_snap
+        try:
+            l = fn35_snap.load_snapshot(
+                snapdir, macho_path, sandbox, budget=budget,
+                trace_n=trace_n, live_log=live)
+            resume = True
+            print("[fn35] RESUMED from snapshot: %s" % snapdir)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print("[fn35] resume failed (%r); cold start" % (e,))
+            l = None
+    else:
+        l = None
+
+    if l is None:
+        l = FNLoader(macho_path, sandbox, budget=budget, trace_n=trace_n,
+                     live_log=live)
+        print("[fn35] integrated loader starting")
+        print("[fn35] mach-o: %s" % macho_path)
+        print("[fn35] cryptid=%d (0 = decrypted, good)"
+              % l.macho.cryptid)
+        try:
+            l.prepare()
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print("[fn35] prepare failed: %r" % e)
+            return 1
     l.run()
+
+    # save state for the next chained segment
+    if snapdir and l.stop_reason == "budget" and not l.fatal_msg:
+        try:
+            import fn35_snap
+            fn35_snap.save_snapshot(
+                l, snapdir, note="seg after %.0fs" % budget)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print("[fn35] snapshot save failed: %r" % (e,))
 
     out = os.path.join(base, "download/fn35/fn35_boot_report.txt")
     os.makedirs(os.path.dirname(out), exist_ok=True)

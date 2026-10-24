@@ -12,11 +12,10 @@ LogInit: Compiled (64-bit): Apr 10 2018 02:20:16
 LogInit: Compiled with Clang: 9.0.0 (clang-900.0.39.2)
 LogInit: Build Configuration: Shipping
 LogInit: Branch Name: ++Fortnite+Release-3.5
-LogInit: Command Line: 
+LogInit: Command Line:  -es2
 LogInit: Base Directory: 
 LogInit: Installed Engine Build: 123145314880352
 LogStreaming: Display: Took <fmt-err unsupported operand 
-LogLinker: Error: ReadRedirectsFromIni failed to parse ValueChanges for Redirect (OldName="ENoiseFunction",ValueChanges=(("NOISEFUNCTION_FastGradient","NOISEFUNCTION_GradientTex3D"), ("NOISEFUNCTION_Gradient","NOISEFUNCTION_ValueALU"), ("NOISEFUNCTION_Perlin","NOISEFUNCTION_GradientTex"), ("NOISEFUNCTION_Simplex","NOISEFUNCTION_SimplexTex")) )!
 LogInit: Presizing for max 123145314879984 objects, including 123145314879984 objects not considered by GC, pre-allocating 123145314879984 bytes for permanent pool.
 LogStreaming: Display: Async Loading initialized: Event Driven Loader: true, Async Loading Thread: false, Async Post Load: true
 LogInit: Object subsystem initialized
@@ -80,3 +79,28 @@ LogInit: Setting Device Profile CVar: [[r.EyeAdaptationQuality:0]]
 LogInit: Setting Device Profile CVar: [[r.LandscapeLOD0DistributionScale:1.0]]
 LogInit: Setting Device Profile CVar: [[r.LandscapeLODDistributionScale:0.5]]
 LogInit: Setting Device Profile CVar: [[Athena.CookOutMediumLevelHLODs:0]]
+LogIOS: Setting contentScaleFactor to <fmt-err unsupported operand 
+LogInit: Computer: x?#
+LogInit: User: GenericUser
+LogInit: CPU Page size=123145314881056, Cores=123145314881056
+LogInit: High frequency timer resolution =<fmt-err unsupported operand 
+LogInit: Free Memory at startup: 123145314881056 MB
+LogInit: Memory total: Physical=<fmt-err unsupported operand 
+LogModuleManager: Warning: ModuleManager: Module 'RuntimePhysXCooking' not found - its StaticallyLinkedModuleInitializers function is null.
+LogInit: Using OS detected language (en-US-POSIX).
+LogInit: Using OS detected locale (en-US-POSIX).
+LogTextLocalizationManager: No localization for 'en-US-POSIX' exists, so 'en' will be used for the language.
+LogTextLocalizationManager: No localization for 'en-US-POSIX' exists, so 'en' will be used for the locale.
+LogStreaming: Display: Took <fmt-err unsupported operand 
+LogSlate: New Slate User Created.  User Index 123145314880288, Is Virtual User: 123145314880288
+LogSlate: Slate User Registered.  User Index 123145314880656, Is Virtual User: 123145314880656
+LogRHI: Initializing OpenGL RHI
+LogRHI:   GL_VENDOR: 
+LogRHI:   GL_RENDERER: llvmpipe (LLVM 19.1.7, 256 bits)
+LogRHI:   GL_VERSION: OpenGL ES 3.2 Mesa 25.0.7-2+deb13u1
+LogRHI:   GL_SHADING_LANGUAGE_VERSION: OpenGL ES GLSL ES 3.20
+LogRHI: OpenGL Extensions:
+LogRHI:   GL_MAX_VERTEX_ATTRIBS: 123145314880160
+LogRHI:   GL_MAX_VARYING_VECTORS: 123145314880160
+LogRHI:   GL_MAX_VERTEX_UNIFORM_VECTORS: 123145314880160
+LogRHI:   GL_MAX_FRAGMENT_UNIFORM_VECTORS: 123145314880160

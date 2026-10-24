@@ -1,179 +1,142 @@
 ========================================================================
 FN3.5 INTEGRATED LOADER -- BOOT REPORT
-generated: 2026-10-24 11:11:48
+generated: 2026-10-24 15:20:46
 ========================================================================
 
 1. EXECUTION
    stop reason : budget
    fatal       : None
    exit code   : None
-   wall time   : 600.0 s (budget 600 s)
-   instructions: ~3899765000000 (approx, 5000000 per slice)
+   wall time   : 480.0 s (budget 480 s)
+   instructions: ~3242765000000 (approx, 5000000 per slice)
    phase       : main (mod_init 773/773 done)
 
 2. LINK (dyld substitute)
    GOT slots filled : 1741
    import stubs     : 1715
-   data cells       : 15949
+   data cells       : 12023
    mod_init funcs   : 773
 
-3. THREADS (15328 created, 17 tracked)
+3. THREADS (11394 created, 16 tracked)
    created by name:
-   of.timerForSplashScreen               10043
-   of.RecordPeakMemory                    5264
+   of.timerForSplashScreen                7362
+   of.RecordPeakMemory                    4011
    pthread                                  15
    of.MainAppThread:                         1
    of.NoUrlCommandLine                       1
    dispatch_async                            1
    main               tid=1000     pc=000102db0504 blocked  instr~185000000 ('forever', 'uikit_runloop')
-   of.MainAppThread:  tid=1010     pc=000101b66a64 blocked  instr~1742145000000 ('sleep', None) wake_ns=1792840307745075353 (now=1792840307744425113)
-   pthread            tid=11b0     pc=000102c52688 blocked  instr~5000000 ('cond', 109951174328512)
-   pthread            tid=11c8     pc=000102c52688 blocked  instr~5000000 ('cond', 109951174328832)
-   pthread            tid=11d0     pc=000102c52688 blocked  instr~5000000 ('cond', 109951174329152)
-   pthread            tid=11d8     pc=000102c52688 blocked  instr~5000000 ('cond', 109951174329472)
-   pthread            tid=1300     pc=000102c52628 blocked  instr~195605000000 ('cond', 109951174329792) wake_ns=1792840308010000000 (now=1792840307744425113)
-   pthread            tid=1318     pc=000102c52628 blocked  instr~195390000000 ('cond', 109951174329952) wake_ns=1792840308010000000 (now=1792840307744425113)
-   pthread            tid=1320     pc=000102c52628 blocked  instr~195155000000 ('cond', 109951174330112) wake_ns=1792840308010000000 (now=1792840307744425113)
-   pthread            tid=1328     pc=000102c52628 blocked  instr~194940000000 ('cond', 109951174330272) wake_ns=1792840308010000000 (now=1792840307744425113)
-   pthread            tid=1330     pc=000102c52628 blocked  instr~194680000000 ('cond', 109951174330432) wake_ns=1792840308010000000 (now=1792840307744425113)
-   pthread            tid=1338     pc=000102c52628 blocked  instr~194490000000 ('cond', 109951174330592) wake_ns=1792840308010000000 (now=1792840307744425113)
-   pthread            tid=1858     pc=00010101904c blocked  instr~211570000000 ('sleep', None) wake_ns=1792840307749777807 (now=1792840307744425113)
-   pthread            tid=19f0     pc=000102c52628 blocked  instr~194240000000 ('cond', 109951203890368) wake_ns=1792840308010000000 (now=1792840307744425113)
-   pthread            tid=19f8     pc=000102c52628 blocked  instr~194010000000 ('cond', 109951203890048) wake_ns=1792840308010000000 (now=1792840307744425113)
-   pthread            tid=1a08     pc=000102c52628 blocked  instr~193785000000 ('cond', 109951203889888) wake_ns=1792840308010000000 (now=1792840307744425113)
-   pthread            tid=1a10     pc=000102c52628 blocked  instr~193550000000 ('cond', 109951203889728) wake_ns=1792840308010000000 (now=1792840307744425113)
+   pthread            tid=11e0     pc=000102c52688 blocked  instr~5000000 ('cond', 109951174328512)
+   pthread            tid=11f8     pc=000102c52688 blocked  instr~5000000 ('cond', 109951174328832)
+   pthread            tid=1200     pc=000102c52688 blocked  instr~5000000 ('cond', 109951174329152)
+   pthread            tid=1208     pc=000102c52688 blocked  instr~5000000 ('cond', 109951174329472)
+   pthread            tid=1330     pc=000102c52628 blocked  instr~309615000000 ('cond', 109951174329792) wake_ns=1792855245010000000 (now=1792855245087954437)
+   pthread            tid=1348     pc=000102c52628 blocked  instr~309395000000 ('cond', 109951174329952) wake_ns=1792855245010000000 (now=1792855245087954437)
+   pthread            tid=1350     pc=000102c52628 blocked  instr~309235000000 ('cond', 109951174330112) wake_ns=1792855245010000000 (now=1792855245087954437)
+   pthread            tid=1358     pc=000102c52628 blocked  instr~309045000000 ('cond', 109951174330272) wake_ns=1792855245010000000 (now=1792855245087954437)
+   pthread            tid=1360     pc=000102c52628 blocked  instr~308795000000 ('cond', 109951174330432) wake_ns=1792855245010000000 (now=1792855245087954437)
+   pthread            tid=1368     pc=000102c52628 blocked  instr~308565000000 ('cond', 109951174330592) wake_ns=1792855245010000000 (now=1792855245087954437)
+   pthread            tid=1838     pc=00010101904c ready    instr~155430000000  wake_ns=1792855245085039561 (now=1792855245087954437)
+   pthread            tid=19c8     pc=000102c52628 ready    instr~308385000000  wake_ns=1792855245010000000 (now=1792855245087954437)
+   pthread            tid=19d8     pc=000102c52628 ready    instr~308205000000  wake_ns=1792855245010000000 (now=1792855245087954437)
+   pthread            tid=19e0     pc=000102c52628 ready    instr~308030000000  wake_ns=1792855245010000000 (now=1792855245087954437)
+   pthread            tid=19e8     pc=000102c52628 ready    instr~307860000000  wake_ns=1792855245010000000 (now=1792855245087954437)
 
 4. TOP STUB CALLS (imported functions)
-   _mach_absolute_time                          754584
-   _pthread_mutex_lock                          690641
-   _pthread_mutex_unlock                        690627
-   _gettimeofday                                394383
-   _usleep                                      390564
-   _pthread_cond_timedwait                      389169
-   _pthread_getspecific                         353749
-   _objc_msgSend                                349821
-   _objc_getProperty                            348259
-   _strcpy                                       40200
-   _pthread_self                                 14608
-   _pthread_mach_thread_np                       14606
-   ___cxa_atexit                                  7480
-   _mach_host_self                                5270
-   _host_statistics                               5269
-   _task_info                                     5268
-   _pthread_mutex_init                            3650
-   _pthread_mutexattr_init                        3619
-   _pthread_mutexattr_settype                     3619
-   _pthread_mutexattr_destroy                     3619
-   _memmove                                       3404
-   _bzero                                         3069
-   _memset                                        1445
-   _CFStringGetBytes                               760
-   _mmap                                           497
-   _CFStringGetLength                              381
-   _stat                                           311
-   _strtol                                         304
-   _munmap                                         299
-   ___cxa_guard_acquire                            288
-   ___cxa_guard_release                            288
-   _free                                           167
-   _strrchr                                        134
-   _snprintf                                       119
-   _strncpy                                         92
-   _lseek                                           85
-   _NSLog                                           84
-   _atof                                            73
-   _open                                            66
-   _close                                           65
+   _pthread_mutex_lock                          708960
+   _pthread_mutex_unlock                        708946
+   _gettimeofday                                621420
+   _pthread_cond_timedwait                      617426
+   _mach_absolute_time                           43306
+   _strcpy                                       40944
+   _usleep                                       31088
+   _pthread_self                                 14667
+   _pthread_mach_thread_np                       14665
+   ___cxa_atexit                                  7495
+   _memset                                        5188
+   _pthread_getspecific                           4298
+   _memmove                                       4217
+   _mach_host_self                                4019
+   _host_statistics                               4017
+   _task_info                                     4015
+   _pthread_mutex_init                            3778
+   _pthread_mutexattr_init                        3746
+   _pthread_mutexattr_settype                     3746
+   _pthread_mutexattr_destroy                     3746
+   _bzero                                         3271
+   _objc_msgSend                                  1754
+   _CFStringGetBytes                               804
+   _mmap                                           507
+   _CFStringGetLength                              403
+   _strtol                                         325
+   _stat                                           314
+   ___cxa_guard_acquire                            309
+   ___cxa_guard_release                            309
+   _munmap                                         303
+   _free                                           215
+   _strrchr                                        192
+   _snprintf                                       144
+   _strncpy                                        139
+   _NSLog                                          109
+   _lseek                                           91
+   _atof                                            89
+   _open                                            77
+   _close                                           76
+   _fstat                                           67
 
 5. UNIMPLEMENTED STUBS (auto-returned 0)
+   _pthread_mutexattr_setprotocol                   26
    _pthread_getschedparam                           16
    _pthread_setschedparam                           16
-   _logf                                             7
-   _objc_setProperty_atomic                          6
+   _logf                                             9
    _uuid_generate                                    5
-   _pthread_rwlock_init                              4
+   _pthread_rwlock_init                              5
    ___strncat_chk                                    4
    _CFLocaleGetValue                                 4
-   _objc_setProperty_nonatomic                       2
    _NSSearchPathForDirectoriesInDomains              2
    _CFLocaleCopyCurrent                              2
+   _gethostname                                      2
    _acosf                                            1
    _thread_policy_set                                1
    _CFLocaleCopyPreferredLanguages                   1
    _tzset                                            1
-   _gethostname                                      1
+   _setrlimit                                        1
+   _pthread_rwlock_wrlock                            1
+   _pthread_rwlock_unlock                            1
 
 6. SYSCALLS
 
-9. OBJC (last 20 of 88)
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000045190 precomposedStringWithCanonicalMapping]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000045b10 precomposedStringWithCanonicalMapping]
-   ?? [0x600000045b10 precomposedStringWithCanonicalMapping]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x600000043630 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
-   ?? [0x7000047ffe30 initWithFrame:]
+9. OBJC (last 20 of 104)
+   ?? [0x6000000436a0 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x6000000436a0 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x6000000436a0 createDirectoryAtPath:withIntermediateDirectories:attributes:error:]
+   ?? [0x600000046420 setClearsContextBeforeDrawing:]
+   ?? [0x6000000415f0 safeAreaInsets]
+   ?? [0x600000041580 brightness]
+   ?? [0x600000046a70 precomposedStringWithCanonicalMapping]
+   ?? [0x600000046a70 precomposedStringWithCanonicalMapping]
+   ?? [0x600000046a70 precomposedStringWithCanonicalMapping]
+   ?? [0x6000000477a0 precomposedStringWithCanonicalMapping]
+   ?? [0x600000047810 precomposedStringWithCanonicalMapping]
+   ?? [0x600000047cc0 precomposedStringWithCanonicalMapping]
+   ?? [0x510000006140 currentQueue]
+   ?? [0x600000041ce0 addObserverForName:object:queue:usingBlock:]
+   ?? [0x510000006140 currentQueue]
+   ?? [0x600000041ce0 addObserverForName:object:queue:usingBlock:]
+   ?? [0x510000008f40 startWirelessControllerDiscoveryWithCompletionHandler:]
+   ?? [0x6000000415f0 safeAreaInsets]
+   ?? [0x6000000465e0 API]
+   ?? [0x510000006b40 detachNewThreadSelector:toTarget:withObject:]
 
 10. FAULT LOG
    (none)
 
 11. CONSOLE TAIL (last 120 lines)
-   printf: LogICUInternationalization: Display: ICU TimeZone Detection - Raw Offset: +123145314879792:29, Platform Override: ''
-   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
-   printf: LogICUInternationalization: Display: ICU TimeZone Detection - Raw Offset: +123145314879792:29, Platform Override: ''
-   [kernel] sysctlbyname(kern.osrevision) -> ENOENT
-   [kernel] sysctlbyname(kern.uuid) -> ENOENT
-   [kernel] sysctlbyname(machdep.cpu.brand_string) -> ENOENT
-   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
-   printf: LogStreaming: Display: Took <fmt-err unsupported operand
-   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
-   printf: LogStreaming: Display: Took <fmt-err unsupported operand
-   [NSLog] LogInit: RandInit(123145314881152) SRandInit(123145314881152).
-   [NSLog] LogTaskGraph: Started task graph with 123145314880992 named threads and 123145314880992 total threads with 123145314880992 sets of task threads.
-   [NSLog] LogICUInternationalization: Display: ICU TimeZone Detection - Raw Offset: +123145314879792:29, Platform Override: ''
-   [NSLog] LogStreaming: Display: Took <fmt-err unsupported operand
-   [NSLog] LogInit: Build: ++Fortnite+Release-3.5-CL-3994867
-   [NSLog] LogInit: Engine Version: 123145314887440.123145314887440.123145314887440-123145314887440+++Fortnite+Release-3.5
-   [NSLog] LogInit: Compatible Engine Version: 123145314887440.123145314887440.123145314887440-123145314887440+++Fortnite+Release-3.5
-   [NSLog] LogInit: Net CL: 123145314880352
-   [NSLog] LogInit: OS: IOS (123145314887440.123145314887440.123145314887440), CPU: iPhone10,4, GPU: GenericGPUBrand
-   [NSLog] LogInit: Compiled (64-bit): Apr 10 2018 02:20:16
-   [NSLog] LogInit: Compiled with Clang: 9.0.0 (clang-900.0.39.2)
-   [NSLog] LogInit: Build Configuration: Shipping
-   [NSLog] LogInit: Branch Name: ++Fortnite+Release-3.5
-   [NSLog] LogInit: Command Line:
-   [NSLog] LogInit: Base Directory:
-   [NSLog] LogInit: Installed Engine Build: 123145314880352
-   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
-   printf: LogStreaming: Display: Took <fmt-err unsupported operand
-   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
-   printf: LogStreaming: Display: Took <fmt-err unsupported operand
-   [NSLog] LogStreaming: Display: Took <fmt-err unsupported operand
-   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
-   printf: LogLinker: Error: ReadRedirectsFromIni failed to parse ValueChanges for Redirect (OldName="ENoiseFunction",ValueChanges=(("NOISEFUNCTION_FastGradient","NOISEFUNCTION_GradientTex3D"), ("NOISEFUNCTION_Gradient","NOISEFUNCTION_ValueALU"), ("NOISEFUNCTION_Perlin","NOISEFUNCTION_GradientTex"), ("NOISEFUNCTION_Simplex","NOISEFUNCTION_SimplexTex")) )!
-   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
-   printf: %s
-   [NSLog] LogLinker: Error: ReadRedirectsFromIni failed to parse ValueChanges for Redirect (OldName="ENoiseFunction",ValueChanges=(("NOISEFUNCTION_FastGradient","NOISEFUNCTION_GradientTex3D"), ("NOISEFUNCTION_Gradient","NOISEFUNCTION_ValueALU"), ("NOISEFUNCTION_Perlin","NOISEFUNCTION_GradientTex"), ("NOISEFUNCTION_Simplex","NOISEFUNCTION_SimplexTex")) )!
-   [NSLog] LogInit: Presizing for max 123145314879984 objects, including 123145314879984 objects not considered by GC, pre-allocating 123145314879984 bytes for permanent pool.
-   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
    printf: LogStreaming: Display: Async Loading initialized: Event Driven Loader: true, Async Loading Thread: false, Async Post Load: true
    [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
    printf: LogStreaming: Display: Async Loading initialized: Event Driven Loader: true, Async Loading Thread: false, Async Post Load: true
    [NSLog] LogStreaming: Display: Async Loading initialized: Event Driven Loader: true, Async Loading Thread: false, Async Post Load: true
-   [NSLog] `Ts
+   [NSLog] @VX
    [NSLog] LogIOS: Selected Device Profile: [IPhone8]
    [NSLog] LogInit: Applying CVar settings loaded from the selected device profile: [IPhone8]
    [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
@@ -205,7 +168,7 @@ generated: 2026-10-24 11:11:48
    printf: LogInit: Warning: Creating unregistered Device Profile CVar: [[r.Scalability.MaxTextureQualityForLowVirtualMemory:0]]
    [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
    printf: LogInit: Warning: Creating unregistered Device Profile CVar: [[r.Scalability.MaxTextureQualityForLowVirtualMemory:0]]
-   [NSLog] @e&
+   [NSLog] @e'
    [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
    printf: LogInit: Warning: Creating unregistered Device Profile CVar: [[r.Scalability.MaxTextureQualityForLowVirtualMemory:0]]
    [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
@@ -222,7 +185,7 @@ generated: 2026-10-24 11:11:48
    [NSLog] LogInit: Setting Device Profile CVar: [[FX.AllowGPUParticles:1]]
    [NSLog] LogInit: Setting Device Profile CVar: [[fx.GPUSimulationTextureSizeX:512]]
    [NSLog] LogInit: Setting Device Profile CVar: [[fx.GPUSimulationTextureSizeY:512]]
-   [NSLog] @;P
+   [NSLog] LogInit: Setting Device Profile CVar: [[r.CustomDepth:0]]
    [NSLog] LogInit: Setting Device Profile CVar: [[r.SupportReversedIndexBuffers:False]]
    [NSLog] LogInit: Setting Device Profile CVar: [[r.SupportDepthOnlyIndexBuffers:False]]
    [NSLog] LogInit: Setting Device Profile CVar: [[ai.NavCollisionAvailable:0]]
@@ -232,22 +195,60 @@ generated: 2026-10-24 11:11:48
    [NSLog] LogInit: Setting Device Profile CVar: [[r.ShaderPipelineCache.Enabled:1]]
    [NSLog] LogInit: Setting Device Profile CVar: [[r.ShaderPipelineCache.LogPSO:0]]
    [NSLog] LogInit: Setting Device Profile CVar: [[r.ShaderPipelineCache.ReportPSO:1]]
-   [NSLog]  }w
-   [NSLog]  }w
+   [NSLog]  }\
+   [NSLog]  }\
    [NSLog] LogInit: Setting Device Profile CVar: [[r.SkeletalMeshLODRadiusScale:0.6]]
-   [NSLog] @|w
+   [NSLog] @|\
    [NSLog] LogInit: Setting Device Profile CVar: [[r.DetailMode:0]]
    [NSLog] LogInit: Setting Device Profile CVar: [[r.CookOutUnusedDetailModeComponents:1]]
-   [NSLog] @|w
-   [NSLog] @|w
-   [NSLog] @|w
+   [NSLog] @|\
+   [NSLog] @|\
+   [NSLog] @|\
    [NSLog] LogInit: Setting Device Profile CVar: [[grass.DisableDynamicShadows:1]]
-   [NSLog] `{w
-   [NSLog] `{w
-   [NSLog] `{w
-   [NSLog] `{w
-   [NSLog] `{w
+   [NSLog] `{\
+   [NSLog] `{\
+   [NSLog] `{\
+   [NSLog] `{\
+   [NSLog] `{\
    [NSLog] LogInit: Setting Device Profile CVar: [[r.LandscapeLOD0DistributionScale:1.0]]
    [NSLog] LogInit: Setting Device Profile CVar: [[r.LandscapeLODDistributionScale:0.5]]
    [NSLog] LogInit: Setting Device Profile CVar: [[Athena.CookOutMediumLevelHLODs:0]]
+   [gl] llvmpipe context online (llvmpipe (LLVM 19.1.7, 256 bits))
+   [NSLog] ::: Created a UIView that will support <EAGLContext> :::
+   [NSLog] LogIOS: Setting contentScaleFactor to <fmt-err unsupported operand
+   [NSLog] LogInit: Computer: x?#
+   [NSLog] LogInit: User: GenericUser
+   [NSLog] LogInit: CPU Page size=123145314881056, Cores=123145314881056
+   [NSLog] LogInit: High frequency timer resolution =<fmt-err unsupported operand
+   [NSLog] LogInit: Free Memory at startup: 123145314881056 MB
+   [NSLog] LogInit: Memory total: Physical=<fmt-err unsupported operand
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogModuleManager: Warning: ModuleManager: Module 'RuntimePhysXCooking' not found - its StaticallyLinkedModuleInitializers function is null.
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: %s
+   [NSLog] LogModuleManager: Warning: ModuleManager: Module 'RuntimePhysXCooking' not found - its StaticallyLinkedModuleInitializers function is null.
+   [NSLog] LogInit: Using OS detected language (en-US-POSIX).
+   [NSLog] LogInit: Using OS detected locale (en-US-POSIX).
+   [NSLog] LogTextLocalizationManager: No localization for 'en-US-POSIX' exists, so 'en' will be used for the language.
+   [NSLog] LogTextLocalizationManager: No localization for 'en-US-POSIX' exists, so 'en' will be used for the locale.
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogStreaming: Display: Took <fmt-err unsupported operand
+   [pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+   printf: LogStreaming: Display: Took <fmt-err unsupported operand
+   [NSLog] LogStreaming: Display: Took <fmt-err unsupported operand
+   [NSLog] LogSlate: New Slate User Created.  User Index 123145314880288, Is Virtual User: 123145314880288
+   [NSLog] LogSlate: Slate User Registered.  User Index 123145314880656, Is Virtual User: 123145314880656
+   [warn] gl glGetString: UcError(89060441928960, 4146)
+   [NSLog] LogRHI: Initializing OpenGL RHI
+   [NSLog] @U5
+   [NSLog] @;;
+   [NSLog] @;;
+   [NSLog] LogRHI:   GL_SHADING_LANGUAGE_VERSION: OpenGL ES GLSL ES 3.20
+   [NSLog] LogRHI: OpenGL Extensions:
+   [NSLog] @;;
+   [NSLog] @;;
+   [NSLog] @;;
+   [NSLog] LogRHI:   GL_MAX_FRAGMENT_UNIFORM_VECTORS: 123145314880160
+   [null-call] 'of.MainAppThread:' hit PC=0 (caller lr=0x0 ?+0x0) -- retiring
    [run] stopped: reason=budget fatal=None exit=None
+   [snap] saved 220 regions, 140.1 MB in 0.9s -> /home/z/my-project/fn35/snap

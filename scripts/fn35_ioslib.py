@@ -688,8 +688,7 @@ def _objc_getclass(l, name):
 
 
 @cfunc("_objc_registerClassPair", "_objc_disposeClassPair",
-       "_objc_setAssociatedObject", "_objc_setProperty",
-       "_objc_getProperty", "_objc_copyClassList", "_objc_getClassList",
+       "_objc_setAssociatedObject", "_objc_copyClassList", "_objc_getClassList",
        "_objc_getMetaClass", "_objc_getProtocol",
        "_objc_copyProtocolList", "_objc_addProtocol",
        "_class_getName", "_class_getInstanceSize", "_class_getSuperclass",
@@ -698,15 +697,80 @@ def _objc_getclass(l, name):
        "_object_getClass", "_object_setClass", "_object_getIvar",
        "_object_setIvar", "_method_getName", "_method_getImplementation",
        "_method_setImplementation", "_sel_isEqual", "_sel_getName",
-       "_objc_enumerationMutation", "_objc_autorelease",
+       "_objc_enumerationMutation",
        "_objc_autoreleasePoolPush", "_objc_autoreleasePoolPop",
-       "_objc_retain", "_objc_retainAutorelease",
-       "_objc_retainAutoreleasedReturnValue",
-       "_objc_storeStrong", "_objc_release", "_objc_terminate",
-       "_objc_sync_enter", "_objc_sync_exit", "_objc_copyClassList",
-       "_objc_getClassList", "_objc_msgSendSuper2",
+       "_objc_terminate",
+       "_objc_msgSendSuper2",
        "_objc_beginMessage", "_objc_endMessage")
 def _objc_stub(l, a=0, b=0, c=0, d=0):
+    return 0
+
+
+@cfunc("_objc_getProperty", "_objc_getProperty_atomic")
+def _objc_getproperty(l, selfp, _cmd, offset, atomic=1):
+    """id objc_getProperty(id self, SEL _cmd, ptrdiff_t offset, BOOL atomic)
+    The engine's atomic property POLLS (IOSView wait loop) go through
+    this C entry point, NOT objc_msgSend."""
+    if not selfp:
+        return 0
+    try:
+        return l.rd64(selfp + offset)
+    except Exception:
+        return 0
+
+
+@cfunc("_objc_setProperty")
+def _objc_setproperty(l, selfp, _cmd, offset, value, atomic=1, copy=0):
+    """void objc_setProperty(id self, SEL _cmd, ptrdiff_t offset,
+    id newValue, BOOL atomic, BOOL shouldCopy) -- plain variant takes
+    (offset, newValue)."""
+    if not selfp:
+        return 0
+    try:
+        l.w64(selfp + offset, value & 0xFFFFFFFFFFFFFFFF)
+    except Exception:
+        pass
+    return 0
+
+
+@cfunc("_objc_setProperty_atomic", "_objc_setProperty_atomic_copy",
+       "_objc_setProperty_nonatomic", "_objc_setProperty_nonatomic_copy")
+def _objc_setproperty_v(l, selfp, _cmd, value, offset, atomic=1):
+    """void objc_setProperty_atomic(id self, SEL _cmd, id newValue,
+    ptrdiff_t offset, BOOL atomic) -- CAREFUL: the named variants swap
+    the argument order vs the plain objc_setProperty! (newValue first).
+    Mapping them onto the plain order corrupts the isa (value lands in
+    the offset slot)."""
+    if not selfp:
+        return 0
+    try:
+        l.w64(selfp + offset, value & 0xFFFFFFFFFFFFFFFF)
+    except Exception:
+        pass
+    return 0
+
+
+@cfunc("_objc_retain", "_objc_autorelease", "_objc_release",
+       "_objc_retainAutorelease", "_objc_retainAutoreleasedReturnValue")
+def _objc_retain(l, obj, *rest):
+    # no refcounting in this world; the RETURN VALUE matters (ARC code
+    # assigns the result of retain/autorelease)
+    return obj
+
+
+@cfunc("_objc_storeStrong")
+def _objc_storestrong(l, location, value):
+    """void objc_storeStrong(id *location, id value)"""
+    if location:
+        try:
+            l.w64(location, value & 0xFFFFFFFFFFFFFFFF)
+        except Exception:
+            pass
+    return 0
+
+
+@cfunc("_objc_sync_enter", "_objc_sync_exit")
+def _objc_sync(l, obj):
     return 0
 
 
@@ -799,61 +863,20 @@ def _gl(l, name, x0=0, x1=0, x2=0, x3=0, x4=0, x5=0, x6=0, x7=0):
 
 
 def _reg_gl():
-    names = [
-        "glClearColor", "glClear", "glClearDepthf", "glViewport",
-        "glCreateShader", "glShaderSource", "glCompileShader",
-        "glGetShaderiv", "glGetShaderInfoLog", "glDeleteShader",
-        "glCreateProgram", "glAttachShader", "glLinkProgram",
-        "glGetProgramiv", "glGetProgramInfoLog", "glDeleteProgram",
-        "glUseProgram", "glGenBuffers", "glBindBuffer", "glBufferData",
-        "glBufferSubData", "glDeleteBuffers", "glMapBufferRange",
-        "glUnmapBuffer", "glGenVertexArrays", "glBindVertexArray",
-        "glVertexAttribPointer", "glEnableVertexAttribArray",
-        "glDisableVertexAttribArray", "glDrawArrays", "glDrawElements",
-        "glEnable", "glDisable", "glBlendFunc", "glDepthFunc",
-        "glCullFace", "glFrontFace", "glFinish", "glFlush",
-        "glGetString", "glGetIntegerv", "glPixelStorei", "glReadPixels",
-        "glGenTextures", "glBindTexture", "glTexImage2D",
-        "glTexSubImage2D", "glTexParameteri", "glDeleteTextures",
-        "glActiveTexture", "glGenFramebuffers", "glBindFramebuffer",
-        "glFramebufferTexture2D", "glCheckFramebufferStatus",
-        "glDeleteFramebuffers", "glGenRenderbuffers",
-        "glBindRenderbuffer", "glRenderbufferStorage",
-        "glFramebufferRenderbuffer", "glDeleteRenderbuffers",
-        "glUniform1f", "glUniform2f", "glUniform3f", "glUniform4f",
-        "glUniform1i", "glUniformMatrix4fv", "glGetUniformLocation",
-        "glGetAttribLocation", "glScissor", "glStencilFunc",
-        "glColorMask", "glDepthMask", "glLineWidth", "glPolygonOffset",
-        "glGenerateMipmap", "glGetError", "glIsEnabled", "glGetStringi",
-        "glInvalidateFramebuffer", "glDispatchCompute",
-        "glBindBufferBase", "glUniformBlockBinding", "glFenceSync",
-        "glClientWaitSync", "glDeleteSync", "glBlitFramebuffer",
-    ]
-    for n in names:
-        IMPL["_" + n] = (lambda nm: (lambda l, *a: _gl(l, nm, *a)))(n)
+    # RETIRED: the Mesa/llvmpipe bridge (fn35_gles.register_gl) owns all
+    # GL imports now. These no-op forwarders used to shadow it (import
+    # order), which made glGetString return "fn35" fakes and silently
+    # dropped every draw call.
+    return
 
 
 _reg_gl()
 
 
-@cfunc("_glGetError")
-def _glGetError(l):
-    return 0  # GL_NO_ERROR
-
-
-@cfunc("_glGetString", "_glGetStringi")
-def _glGetString(l, name, index=0):
-    vals = {
-        0x1F00: "", 0x1F01: "Apple Software Renderer (fn35)",
-        0x1F02: "OpenGL ES 3.0 fn35", 0x1F03: "fn35",
-        0x8B8C: "OpenGL ES GLSL ES 3.00 fn35",
-    }
-    return l.cstring_cell("glstr", vals.get(name, ""))
-
-
-@cfunc("_glGetStringi")
-def _glGetStringi(l, name, index):
-    return l.cstring_cell("glstr", "")
+# NOTE: _glGetString/_glGetStringi/_glGetError used to live here as
+# fakes ("fn35" strings, GL_NO_ERROR). The Mesa bridge in fn35_gles
+# provides the real ones now; these registrations were removed so the
+# import order can never shadow it.
 
 
 @cfunc("_MTLCreateSystemDefaultDevice")
@@ -1052,6 +1075,29 @@ def _abort_fn(l):
                % (lr, name or "?", lr - (saddr or 0)))
     for ent in list(l.stub_ring)[-12:]:
         l.console("   %s" % (ent,))
+    # full frame-pointer backtrace: WHO led to this abort?
+    try:
+        from unicorn.arm64_const import UC_ARM64_REG_X29, UC_ARM64_REG_SP
+        fp = l.uc.reg_read(UC_ARM64_REG_X29)
+        sp = l.uc.reg_read(UC_ARM64_REG_SP)
+        chain = []
+        cur = fp
+        for _ in range(24):
+            if not cur or cur < sp - 0x100000:
+                break
+            nxt = l.rd64(cur)
+            ret = l.rd64(cur + 8)
+            if not ret:
+                break
+            nm, sa = l.nearest_symbol(ret)
+            chain.append("0x%x (%s+0x%x)" % (ret, nm or "?",
+                                             ret - (sa or 0)))
+            if nxt <= cur or nxt - cur > 0x40000:
+                break
+            cur = nxt
+        l.console("[abort] backtrace:\n    " + "\n    ".join(chain))
+    except Exception as e:
+        l.console("[abort] backtrace failed: %r" % (e,))
     l.fatal("abort() called from 0x%x (%s+0x%x)"
             % (lr, name or "?", lr - (saddr or 0)))
     return 0
@@ -1072,7 +1118,33 @@ def _assert_rtn(l, func, file, line, expr):
 
 @cfunc("___stack_chk_fail")
 def _stack_chk_fail(l):
-    l.fatal("__stack_chk_fail: stack canary smashed")
+    # NON-FATAL (engineering decision): a specific engine string-building
+    # path writes a tagged value over a neighbouring frame slot under our
+    # emulation. Instead of aborting the whole boot, we pop the failing
+    # frame cleanly (longjmp-style via the frame pointer) and continue
+    # in the caller. The code after `bl ___stack_chk_fail` is the NEXT
+    # function's prologue (the compiler assumes no return), so a plain
+    # PC=lr would execute an unrelated function -- never do that.
+    try:
+        from unicorn.arm64_const import (UC_ARM64_REG_X29,
+                                        UC_ARM64_REG_SP, UC_ARM64_REG_PC)
+        fp = l.uc.reg_read(UC_ARM64_REG_X29)
+        ret = l.rd64(fp + 8) if fp else 0
+        saved_fp = l.rd64(fp) if fp else 0
+        if ret:
+            lr = l.reg_lr()
+            nm, sa = l.nearest_symbol(lr)
+            l.console("[stack_chk] canary mismatch (epilogue %s+0x%x) "
+                      "-- popping frame, return to 0x%x"
+                      % ((nm or "?")[:44], lr - (sa or 0), ret))
+            l.uc.reg_write(UC_ARM64_REG_SP, (fp + 0x10)
+                           & 0xFFFFFFFFFFFFFFFF)
+            l.uc.reg_write(UC_ARM64_REG_X29, saved_fp
+                           & 0xFFFFFFFFFFFFFFFF)
+            l.wreg_x(0, 0)          # benign return value
+            return ("pc", ret & 0xFFFFFFFFFFFFFFFF)
+    except Exception as e:
+        l.console("[stack_chk] pop failed: %r" % (e,))
     return 0
 
 

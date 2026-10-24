@@ -1,0 +1,22 @@
+[pakfs] 3260 entries, mount '../../../', 278 dirs
+[preinit] fake singleton for 0x10552ea60 (vt=0x510000000040 obj=0x510000000140)
+[native] ___toupper   0x500000f00000 cmp w0, #0x7f; b.hi #0x500000f00020; cmp w0, #0x61; b.lo #0x500000f0001c; cmp w0, #0x7a; b.hi #0x500
+[native] ___tolower   0x500000f00030 cmp w0, #0x7f; b.hi #0x500000f00050; cmp w0, #0x41; b.lo #0x500000f0004c; cmp w0, #0x5a; b.hi #0x500
+[native] _strlen      0x500000f00060 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f00090; mov x9, x0; mov x8, #0; ldrb w10, [x9]; cbz w1
+[native] _memcpy      0x500000f000a0 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f000dc; cmp x1, x10; b.lo #0x500000f000dc; mov x8, x0;
+[native] _memcmp      0x500000f000e0 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f00118; cmp x1, x10; b.lo #0x500000f00118; cbz x2, #0x
+[native] _strcmp      0x500000f00130 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f0016c; cmp x1, x10; b.lo #0x500000f0016c; ldrb w8, [x
+[native] _strncmp     0x500000f00180 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f001bc; cmp x1, x10; b.lo #0x500000f001bc; cbz x2, #0x
+[native] _strchr      0x500000f001d0 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f00200; mov x8, x0; ldrb w9, [x8]; cmp w9, w1; b.eq #0
+[objc] 595 binary classes parsed; root NSObject @0x510000000740
+[gl] 84 GL imports bridged to Mesa/llvmpipe
+[MACH-O] mapped 1 segment ranges, 33 sections
+[dyld] filled 1436 GOT slots, applied 15056 binds, 1715 stubs created
+[dyld] 773 module initializers, main at 0x102dae84c
+[pakfs] 3260 entries, mount '../../../', 278 dirs
+[snap] restored: 54 regions, 139.6 MB, phase=main, vclock advanced 9.1s past save
+[fn35] RESUMED from snapshot: /home/z/my-project/fn35/snap
+[run] scheduler start (budget 100s, slice=5000000 instr)
+[run] stopped: reason=budget fatal=None exit=None
+[snap] saved 99 regions, 139.6 MB in 0.9s -> /home/z/my-project/fn35/snap
+[fn35] report -> /home/z/my-project/download/fn35/fn35_boot_report.txt
