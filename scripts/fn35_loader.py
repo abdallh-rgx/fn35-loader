@@ -842,6 +842,14 @@ class FNLoader:
         for addr, code, desc in self.CODE_PATCHES:
             try:
                 self.wrb(addr, code)
+                # CRITICAL: unicorn does NOT invalidate its translated-
+                # block cache on mem_write (verified experimentally:
+                # stale TBs keep executing the ORIGINAL code and the
+                # patch silently never runs). Drop the TB explicitly.
+                try:
+                    self.uc.ctl_remove_cache(addr, addr + len(code))
+                except Exception:
+                    pass
                 self.console("[patch] %s" % desc)
             except Exception as e:
                 self.console("[patch] FAILED %s: %r" % (desc, e))
