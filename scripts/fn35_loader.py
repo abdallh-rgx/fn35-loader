@@ -1149,13 +1149,23 @@ class FNLoader:
     def arm_lastmile_trace(self, n=1_500_000):
         """Bounded per-instruction ring, armed at a console milestone.
         When a fault hits, the last instructions are disassembled to
-        reveal the exact branch that went wrong."""
+        reveal the exact branch that went wrong. The full TB cache is
+        flushed on arming: blocks translated BEFORE the hook existed
+        would otherwise execute without firing it (the ring would lie
+        by omission -- exactly what hid the segBN crash site)."""
         from unicorn import UC_HOOK_CODE
         try:
             self._lm_ring = deque(maxlen=n)
             self._lm_hook = self.uc.hook_add(
                 UC_HOOK_CODE, self._lm_hook_fn)
-            self.console("[lm-trace] armed ring of %d instructions" % n)
+            try:
+                # flush every cached TB so all future blocks are
+                # translated WITH the trace hook compiled in
+                self.uc.ctl_remove_cache(1, 0xFFFFFFF00000)
+            except Exception:
+                pass
+            self.console("[lm-trace] armed ring of %d instructions "
+                         "(TB cache flushed)" % n)
         except Exception as e:
             self.console("[lm-trace] arm failed: %r" % (e,))
 
