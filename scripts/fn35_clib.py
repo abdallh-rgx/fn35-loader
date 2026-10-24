@@ -778,6 +778,25 @@ def _printf(l, fmt):
             l.console("[freewarn-stack] %s" % " <- ".join(chain[:16]))
         except Exception as e:
             l.console("[freewarn-stack] walk failed %r" % (e,))
+    if "CRC error" in txt2 and getattr(l, "_crc_bt_done", 0) < 3:
+        l._crc_bt_done = getattr(l, "_crc_bt_done", 0) + 1
+        try:
+            chain = []
+            fp = l.reg_x(29)
+            for _ in range(40):
+                if not fp or fp < 0x1000:
+                    break
+                nxt = l.rd64(fp)
+                ret = l.rd64(fp + 8)
+                if nxt <= fp or nxt - fp > 0x100000:
+                    break
+                nm, sa = l.nearest_symbol(ret)
+                chain.append("0x%x (%s+0x%x)" % (ret, (nm or "?")[:44],
+                                                  ret - (sa or 0)))
+                fp = nxt
+            l.console("[crc-stack] %s" % " <- ".join(chain[:14]))
+        except Exception as e:
+            l.console("[crc-stack] walk failed %r" % (e,))
     l.console("printf: " + (txt2 or txt))
     return len(txt2 or txt)
 
