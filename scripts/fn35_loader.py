@@ -1701,6 +1701,21 @@ class FNLoader:
         n_gl = fn35_gles.register_gl()
         self.console("[gl] %d GL imports bridged to Mesa/llvmpipe" % n_gl)
 
+        # ---- surgical code patches (guest memory, file untouched) ----
+        # 1. Global-shader verification fatal: this cook is METAL-only
+        #    (global_sf_metal.metallib); we force -es2 for llvmpipe, so
+        #    GLSL_ES2_IOS has no cooked global shaders and the verify
+        #    asserts "Missing global shader FStereoLayerPS, Please make
+        #    sure cooking was successful." Patch the cbnz at 0x10136d094
+        #    into an unconditional branch to the cleanup path
+        #    (0x10136d138): verification "passes", boot continues.
+        try:
+            self.wrb(0x10136d094, b"\x29\x00\x00\x14")  # b +0xA4
+            self.console("[patch] global-shader verify fatal -> skip "
+                        "(0x10136d094: b 0x10136d138)")
+        except Exception as e:
+            self.console("[patch] shader-verify patch failed: %r" % (e,))
+
         self.install_hooks()
 
         # main thread
