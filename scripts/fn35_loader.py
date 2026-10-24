@@ -1801,6 +1801,9 @@ class FNLoader:
         if got:
             msg += " | GOT slot %s" % got
         self.fault_log.append(msg)
+        # armed lastmile ring takes precedence (richer than trace_ring)
+        if getattr(self, "_lm_ring", None) and len(self._lm_ring) > 10:
+            self.dump_lastmile()
         # dump object-tail memory around x0 (FMallocBinned2 diagnosis)
         try:
             x0 = self.reg_x(0)
