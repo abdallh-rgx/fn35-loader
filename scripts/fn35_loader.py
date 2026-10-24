@@ -314,21 +314,38 @@ class FNLoader:
         if last is None:
             self._last_console_wall = now
             return
-        if now - last < 60.0:
+        if now - last < 30.0:
             return
-        self._last_console_wall = now   # fire at most once per 60s
+        self._last_console_wall = now   # fire at most once per 30s
         t = self.cur
+        # memory footprint: unicorn maps guest pages lazily on the host
+        try:
+            regs = self.uc.mem_regions()
+            mapped = sum(r[1] - r[0] + 1 for r in regs) // (1024 * 1024)
+            nreg = len(regs)
+        except Exception:
+            mapped = nreg = 0
+        states = {}
+        top = []
+        for th in self.threads.values():
+            states[th.state] = states.get(th.state, 0) + 1
+            top.append((th.approx_instr, th))
+        top.sort(key=lambda kv: -kv[0])
+        tops = "; ".join("%s(0x%x) %dM %s@%s" % (
+            th.name[:22], th.tid, th.approx_instr // 1000000,
+            th.state, th.wait) for _, th in top[:3])
         if t is not None:
             pc = t.pc
             nm, sa = self.nearest_symbol(pc)
-            self.console("[hb] silent 60s: thr=%r tid=0x%x pc=0x%x (%s+0x%x) "
-                         "instr~%dM threads=%d"
+            self.console("[hb] silent 30s: thr=%r tid=0x%x pc=0x%x (%s+0x%x) "
+                         "instr~%dM threads=%s mapped=%dMB/%dregions"
                          % (t.name, t.tid, pc, (nm or "?")[:44],
                             pc - (sa or 0), t.approx_instr // 1000000,
-                            self.thread_count()))
+                            states, mapped, nreg))
         else:
-            self.console("[hb] silent 60s: idle scheduler threads=%d"
-                         % self.thread_count())
+            self.console("[hb] silent 30s: idle scheduler threads=%s "
+                         "mapped=%dMB/%dregions" % (states, mapped, nreg))
+        self.console("[hb] top3: %s" % tops)
 
     def warn(self, msg):
         self.console("[warn] " + str(msg))
