@@ -748,6 +748,21 @@ def _mk_str_methods():
     T["copy"] = lambda l, r, a: r
     T["mutableCopy"] = lambda l, r, a: _nsstr(
         l, l.objc.read_nsstring(r) or "")
+    # ---- Unicode normalization ------------------------------------------
+    # UE4's FText pipeline calls these on every localized/format path.
+    # Returning the receiver (identity) is correct for ASCII and any
+    # already-normalized text; previously they were unimplemented ->
+    # nil returns -> the engine retried the whole text build forever
+    # (the 20B-instruction "string storm" after the first PNG error).
+    T["precomposedStringWithCanonicalMapping"] = lambda l, r, a: r
+    T["decomposedStringWithCanonicalMapping"] = lambda l, r, a: r
+    T["precomposedStringWithCompatibilityMapping"] = lambda l, r, a: r
+    T["decomposedStringWithCompatibilityMapping"] = lambda l, r, a: r
+    T["stringByFoldingWithOptions:locale:"] = lambda l, r, a: r
+    T["stringByTrimmingCharactersInSet:"] = lambda l, r, a: r
+    T["stringByAppendingString:"] = lambda l, r, a: _nsstr(
+        l, (l.objc.read_nsstring(r) or "")
+        + (l.objc.read_nsstring(a[0]) if a and a[0] else ""))
     T["copyWithZone:"] = lambda l, r, a: r
     T["characterAtIndex:"] = lambda l, r, a: ord(
         (l.objc.read_nsstring(r) or "?")[a[0] % max(
