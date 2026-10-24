@@ -1,16 +1,19 @@
 skills/
 node_modules/
+download/
+db/
+*.pyc
+__pycache__/
+# Copyrighted / too-big game content (kept on disk, NOT in git)
+fn35/extracted/
 fn35/*.ipa
-fn35/*.log
 fn35/snap/
 fn35/pakcache/
 fn35/tools/
 fn35/tools.zip
 fn35/aes-archive/
-fn35/extracted/
-fn35/mfpage.html
 fn35/sandbox/
-download/
-db/
-*.pyc
-__pycache__/
+fn35/mfpage.html
+fn35/pak_index.json
+fn35/*.log
+fn35/*.txt
