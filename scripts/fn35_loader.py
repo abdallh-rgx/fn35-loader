@@ -845,9 +845,11 @@ class FNLoader:
                 # CRITICAL: unicorn does NOT invalidate its translated-
                 # block cache on mem_write (verified experimentally:
                 # stale TBs keep executing the ORIGINAL code and the
-                # patch silently never runs). Drop the TB explicitly.
+                # patch silently never runs). A TB can span the whole
+                # function, so invalidate the FULL PAGE around the patch.
                 try:
-                    self.uc.ctl_remove_cache(addr, addr + len(code))
+                    page_lo = addr & ~0xFFF
+                    self.uc.ctl_remove_cache(page_lo, page_lo + 0x1000)
                 except Exception:
                     pass
                 self.console("[patch] %s" % desc)
