@@ -279,6 +279,38 @@ def _pthread_timedjoin(l, tid, retval_ptr, abstime):
     return _pthread_join(l, tid, retval_ptr)
 
 
+@cfunc("_sched_yield", "_swtch_pri", "_pthread_yield_np", "_pthread_yield",
+       "_sched_yield")
+def _sched_yield(l):
+    """Yield with adaptive backoff.
+
+    Observed in segAP: a spinning thread issued 11.9M sched_yield calls,
+    starving the whole cooperative scheduler (MainAppThread got ~0
+    progress for its entire 490s budget). XNU would just requeue the
+    caller; we do that for the first few yields, then deschedule the
+    stormer with a growing backoff (0.2ms .. 25ms) so real threads run."""
+    t = l.cur
+    sp = t.specific
+    now = getattr(l, "vclock", 0)
+    if now - sp.get("ylast", 0) > 10_000_000:   # 10ms of quiet: reset
+        sp["yn"] = 0
+    sp["ylast"] = now
+    n = sp.get("yn", 0) + 1
+    sp["yn"] = n
+    if n > 512:
+        backoff = min(200_000 * min(n - 512, 125), 25_000_000)
+        sp["yn"] = 512                    # cap the counter growth
+        l.block_cur("yield", t.tid, wake_ns=now + backoff)
+    else:
+        try:
+            if t.tid in l.order:
+                l.order.remove(t.tid)
+                l.order.append(t.tid)
+        except Exception:
+            pass
+    return 0
+
+
 @cfunc("_pthread_detach", "_pthread_attr_init", "_pthread_attr_destroy",
        "_pthread_attr_setdetachstate", "_pthread_attr_setstacksize",
        "_pthread_attr_getstacksize", "_pthread_attr_setschedparam",
