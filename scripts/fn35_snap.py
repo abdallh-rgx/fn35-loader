@@ -302,6 +302,36 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
             l.console("[snap] pakfs rebuild failed: %r" % (ex,))
             l.pakfs = None
 
+    # ---- farm integrity heal -------------------------------------------
+    # The saved farm is often many separate 4KB regions; restore + a
+    # partial-page farm_off can leave pages unmapped while the restored
+    # bookkeeping (farm_mapped_end) claims coverage. That hole was the
+    # segAJ killer (glGetString(GL_EXTENSIONS) -> UcError WRITE_UNMAPPED
+    # -> poisoned cstring cell -> MainAppThread PC=0). Walk the whole
+    # farm span and map any missing page explicitly.
+    try:
+        import fn35_loader as _FL
+        _farm_lo = _FL.DATA_FARM
+        _farm_hi = max(l.farm_off, l.farm_mapped_end)
+        _page = _FL.PAGE
+        _holes = 0
+        _p = _farm_lo
+        while _p < _farm_hi:
+            try:
+                l.uc.mem_read(_p, 1)
+            except Exception:
+                try:
+                    l.uc.mem_map(_p, _page)
+                    _holes += 1
+                except Exception:
+                    pass
+            _p += _page
+        if _holes:
+            l.console("[snap] farm heal: mapped %d missing page(s) in "
+                      "[0x%x .. 0x%x)" % (_holes, _farm_lo, _farm_hi))
+    except Exception as _e:
+        l.console("[snap] farm heal skipped: %r" % (_e,))
+
     # resume bookkeeping
     l.phase = getattr(l, "phase", "main") or "main"
     l.stop_reason = None

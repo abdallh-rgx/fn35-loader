@@ -330,12 +330,27 @@ class FNLoader:
 
     # ================= memory primitives ============================
     def map_range(self, addr, size):
+        """Map [addr, addr+size) in unicorn, tolerating already-mapped
+        pages. uc.mem_map is ATOMIC: it fails if ANY page in the range
+        is already mapped. Swallowing that failure whole used to leave
+        HOLES in the data farm: farm_mapped_end advanced but pages were
+        missing -> later writes raised UcError(addr, size) (segAJ bug:
+        glGetString(GL_EXTENSIONS) -> cstring_cell -> dead MainAppThread).
+        Fast path maps the whole span; fallback maps page by page."""
         start = align_down(addr, PAGE)
         end = align_up(addr + size, PAGE)
         try:
             self.uc.mem_map(start, end - start)
+            return
         except UcError:
-            pass  # already mapped
+            pass
+        p = start
+        while p < end:
+            try:
+                self.uc.mem_map(p, PAGE)
+            except UcError:
+                pass          # page already mapped: fine, skip it
+            p += PAGE
 
     def _ensure(self, cur_end, want_end, limit):
         if want_end <= cur_end:
@@ -500,7 +515,14 @@ class FNLoader:
         self.farm_off += size
         self.data_cells[name] = a
         if init:
-            self.wrb(a, bytes(init)[:size])
+            try:
+                self.wrb(a, bytes(init)[:size])
+            except Exception:
+                # DO NOT leave a poisoned cache entry (empty cell that
+                # every future caller returns without writing): drop it
+                # so the next request reallocates cleanly.
+                self.data_cells.pop(name, None)
+                raise
         return a
 
     def cstring_cell(self, name, s):
@@ -548,6 +570,15 @@ class FNLoader:
                     else:
                         self.farm_mapped_end = max(self.farm_mapped_end,
                                                    new_end)
+                else:
+                    # bookkeeping claims this is mapped, but a swallowed
+                    # mem_map failure can leave holes. VERIFY and repair.
+                    try:
+                        self.uc.mem_read(addr, 1)
+                    except Exception:
+                        self.map_range(align_down(addr, PAGE),
+                                       align_up(addr + PAGE, PAGE)
+                                       - align_down(addr, PAGE))
                 return True
         # UE4's binned allocator manages this VA window itself and indexes
         # it with 4 GB pool strides -- serve it infinite zero pages
@@ -1771,6 +1802,17 @@ class FNLoader:
                              "%s+0x%x) -- retiring"
                              % (t.name, lr, (nm or "?")[:40],
                                 lr - (sa or 0)))
+                if t.tid == 0x1000 or t.name.startswith("of.MainAppThread"):
+                    # the game's driver thread (UE4 spawns the real main
+                    # loop via an ObjC "MainAppThread:" selector; the
+                    # original "main" tid 0x1000 usually waits on it).
+                    # Retiring it silently made later segments spin for
+                    # their whole budget with zero progress.
+                    self.stop_reason = "main-dead"
+                    self.fatal_msg = ("main thread null-call at lr=0x%x "
+                                     "(%s+0x%x)" % (lr, nm or "?",
+                                                    lr - (sa or 0)))
+                    break
                 self.thread_done(t)
                 continue
             t.approx_instr += self.slice_instr

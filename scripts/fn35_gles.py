@@ -596,19 +596,8 @@ def _sp_flushmapped(l, args):
 
 
 def _sp_getstring(l, args):
+    """glGetString(name) -> const GLubyte*"""
     enum = args[0] & 0xFFFFFFFF
-    if enum == 0x1F03 and len(args) > 1 and args[1] != 0:
-        # glGetStringi(GL_EXTENSIONS, i): the engine indexes extensions
-        # one by one; returning the whole list as one "name" overflows
-        # fixed-size name buffers in the RHI's extension parser.
-        try:
-            exts = (GLES.gstr(0x8B8C) or b"").decode("utf-8", "replace") \
-                .split()
-        except Exception:
-            exts = []
-        idx = args[1] & 0xFFFFFFFF
-        v = exts[idx] if idx < len(exts) else ""
-        return l.cstring_cell("glstri.%d" % idx, v)
     vals = {
         0x1F00: b"", 0x1F01: GLES.gstr(0x1F01),
         0x1F02: GLES.gstr(0x1F02), 0x1F03: GLES.gstr(0x1F03),
@@ -619,6 +608,20 @@ def _sp_getstring(l, args):
     # the first string forever (vendor == renderer == version ...).
     # Unique per-enum names keep every GL string distinct.
     return l.cstring_cell("glstr.%x" % enum, v.decode("utf-8", "replace"))
+
+
+def _sp_getstringi(l, args):
+    """glGetStringi(GL_EXTENSIONS, i): the engine indexes extensions
+    one by one; returning the whole list as one "name" overflows
+    fixed-size name buffers in the RHI's extension parser."""
+    idx = (args[1] if len(args) > 1 else 0) & 0xFFFFFFFF
+    try:
+        exts = (GLES.gstr(0x8B8C) or b"").decode("utf-8", "replace") \
+            .split()
+    except Exception:
+        exts = []
+    v = exts[idx] if idx < len(exts) else ""
+    return l.cstring_cell("glstri.%d" % idx, v)
 
 
 def _sp_getshaderprecision(l, args):
@@ -756,7 +759,7 @@ _SPECIAL = {
     "glUnmapBuffer": _sp_unmap,
     "glFlushMappedBufferRange": _sp_flushmapped,
     "glGetString": _sp_getstring,
-    "glGetStringi": _sp_getstring,
+    "glGetStringi": _sp_getstringi,
     "glGetShaderPrecisionFormat": _sp_getshaderprecision,
     "glShaderSource": _sp_shadersource,
     "glGetShaderInfoLog": _sp_getshaderinfolog,
