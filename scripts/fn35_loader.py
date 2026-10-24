@@ -1148,11 +1148,36 @@ class FNLoader:
                 lr = 0
             self.console("[null-call] PC=0 caught live: lr=0x%x" % lr)
             try:
+                sp = self.uc.reg_read(a64.UC_ARM64_REG_SP)
+                self.console("[null-call] sp=0x%x (ZERO-STACK!)"
+                             % sp if not sp else
+                             "[null-call] sp=0x%x" % sp)
+            except Exception:
+                pass
+            try:
                 xs = " ".join("x%d=0x%x" % (i, self.reg_x(i))
                               for i in range(9))
                 self.console("[null-call] %s" % xs)
             except Exception:
                 pass
+            # last stub calls -- WHICH stub returned into this state?
+            try:
+                _FILEY = ("_open", "_fopen", "_stat", "_access", "_read",
+                          "_pread", "_lseek", "_close", "_mkdir", "_unlink",
+                          "_rename", "_fcntl", "_dlopen", "_NSLog", "_printf",
+                          "_puts", "_fprintf", "_opendir", "_readdir")
+                ents = list(self.stub_ring)
+                nfo = [e for e in ents
+                       if any(f in str(e[0]) for f in _FILEY)]
+                self.console("[null-call] file/log ops (last 40 of %d):"
+                             % len(nfo))
+                for ent in nfo[-40:]:
+                    self.console("   %s" % (ent,))
+                self.console("[null-call] raw tail 20:")
+                for ent in ents[-20:]:
+                    self.console("   %s" % (ent,))
+            except Exception as e:
+                self.console("[null-call] ring dump failed %r" % (e,))
             # poor-man's backtrace: scan the stack for return addresses
             # (image-range qwords) -- works even when fp/lr are zeroed
             try:
