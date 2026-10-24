@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install emulation deps
+        run: python -m pip install --upgrade pip && pip install unicorn capstone
+
+      - name: Byte-compile every script (syntax gate)
+        run: |
+          python - <<'EOF'
+          import compileall, sys
+          ok = compileall.compile_dir('scripts', quiet=1, force=True)
+          sys.exit(0 if ok else 1)
+          EOF
+
+      - name: Run self-test (Unicorn + Capstone + Mach-O parser)
+        run: python scripts/selftest.py
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ruff (non-blocking style pass)
+        run: |
+          pip install ruff
+          ruff check scripts/ --select E9,F63,F7,F82 --quiet || true
