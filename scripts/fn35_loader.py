@@ -812,6 +812,26 @@ class FNLoader:
     def env_unset(self, name):
         self.env.pop(name, None)
 
+    CODE_PATCHES = [
+        # Global-shader verification fatal: this cook is METAL-only
+        # (global_sf_metal.metallib); we force -es2 for llvmpipe, so
+        # GLSL_ES2_IOS has no cooked global shaders and the verify
+        # asserts "Missing global shader FStereoLayerPS, Please make
+        # sure cooking was successful." Convert the cbnz at 0x10136d094
+        # into an unconditional branch to the cleanup path (0x10136d138):
+        # verification "passes", boot continues.
+        (0x10136d094, b"\x29\x00\x00\x14",
+         "global-shader verify fatal -> skip (b 0x10136d138)"),
+    ]
+
+    def apply_code_patches(self):
+        for addr, code, desc in self.CODE_PATCHES:
+            try:
+                self.wrb(addr, code)
+                self.console("[patch] %s" % desc)
+            except Exception as e:
+                self.console("[patch] FAILED %s: %r" % (desc, e))
+
     def install_hooks(self):
         self.uc.hook_add(UC_HOOK_INTR, self.hook_intr)
         self.uc.hook_add(UC_HOOK_MEM_INVALID, self.hook_mem_invalid)
@@ -1702,19 +1722,10 @@ class FNLoader:
         self.console("[gl] %d GL imports bridged to Mesa/llvmpipe" % n_gl)
 
         # ---- surgical code patches (guest memory, file untouched) ----
-        # 1. Global-shader verification fatal: this cook is METAL-only
-        #    (global_sf_metal.metallib); we force -es2 for llvmpipe, so
-        #    GLSL_ES2_IOS has no cooked global shaders and the verify
-        #    asserts "Missing global shader FStereoLayerPS, Please make
-        #    sure cooking was successful." Patch the cbnz at 0x10136d094
-        #    into an unconditional branch to the cleanup path
-        #    (0x10136d138): verification "passes", boot continues.
-        try:
-            self.wrb(0x10136d094, b"\x29\x00\x00\x14")  # b +0xA4
-            self.console("[patch] global-shader verify fatal -> skip "
-                        "(0x10136d094: b 0x10136d138)")
-        except Exception as e:
-            self.console("[patch] shader-verify patch failed: %r" % (e,))
+        # Also re-applied by fn35_snap.load_snapshot AFTER the region
+        # overlay (the overlay would otherwise restore the original
+        # bytes over our patched ones).
+        self.apply_code_patches()
 
         self.install_hooks()
 

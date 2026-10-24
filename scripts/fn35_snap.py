@@ -345,6 +345,12 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
     l.py_stack = []
     l.pending_py = None
     l.t_start = None
+    # re-apply code patches: the region overlay above restored the
+    # ORIGINAL __TEXT bytes over them
+    try:
+        l.apply_code_patches()
+    except Exception as _e:
+        l.console("[snap] code patch re-apply failed: %r" % (_e,))
     # derived cache: stale entries from older snapshots can mis-call
     # implementations that gained real signatures since (see the
     # _sched_yield TypeError storm in segAR)
