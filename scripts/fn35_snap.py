@@ -145,6 +145,11 @@ def save_snapshot(l, snapdir, note=""):
 
     # --- python-side state ---
     state = dict(l.__dict__)
+    # NEVER persist the impl-arity cache: it is derived from IMPL's
+    # current signatures. A stale entry (e.g. "_sched_yield" recorded
+    # as variadic back when it was an unimplemented import) resurrects
+    # on restore and mis-calls NEW implementations with 9 args.
+    state.pop("_arity", None)
     for k in _DROP:
         state[k] = None
     state["fds"] = _ser_fds(l)
@@ -340,6 +345,10 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
     l.py_stack = []
     l.pending_py = None
     l.t_start = None
+    # derived cache: stale entries from older snapshots can mis-call
+    # implementations that gained real signatures since (see the
+    # _sched_yield TypeError storm in segAR)
+    l._arity = {}
     # clock anchors: allow vclock to catch up with the pause gap
     l._clk_anchor_wall = None
     l.vclock = max(int(time.time() * 1e9) - 50_000_000,
