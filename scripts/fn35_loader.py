@@ -1105,6 +1105,58 @@ class FNLoader:
     def on_fetch(self, addr):
         # with the stub farm mapped + svc dispatch, this only fires on
         # genuine unmapped execution -- a real crash
+        if addr == 0:
+            # null-call captured LIVE: the faulting fetch is PC=0 and
+            # the registers still hold the argument setup of the call.
+            try:
+                lr = self.uc.reg_read(a64.UC_ARM64_REG_LR)
+            except Exception:
+                lr = 0
+            self.console("[null-call] PC=0 caught live: lr=0x%x" % lr)
+            try:
+                xs = " ".join("x%d=0x%x" % (i, self.reg_x(i))
+                              for i in range(9))
+                self.console("[null-call] %s" % xs)
+            except Exception:
+                pass
+            try:
+                import capstone
+                md = capstone.Cs(capstone.CS_ARCH_ARM64,
+                                 capstone.CS_MODE_ARM)
+                if 0x100000000 <= (lr - 4) < 0x106000000:
+                    code = self.rdb(lr - 16, 32)
+                    for ins in md.disasm(code, lr - 16):
+                        mark = "  <<< THE CALL" if ins.address <= lr - 4 \
+                               < ins.address + ins.size else ""
+                        self.console("[null-call] 0x%x %-8s %s%s"
+                                     % (ins.address, ins.mnemonic,
+                                        ins.op_str, mark))
+            except Exception as e:
+                self.console("[null-call] disasm failed %r" % (e,))
+            # frame-chain walk (x29 may be zero for leaf frames)
+            try:
+                fp = self.uc.reg_read(a64.UC_ARM64_REG_X29)
+                sp = self.uc.reg_read(a64.UC_ARM64_REG_SP)
+                seen = set()
+                nfr = 0
+                while fp and sp - 0x400000 < fp < sp + 0x400000 \
+                        and nfr < 24 and fp not in seen:
+                    seen.add(fp)
+                    try:
+                        nxt = self.rd64(fp)
+                        ret = self.rd64(fp + 8)
+                    except Exception:
+                        break
+                    nm, sa = self.nearest_symbol(ret)
+                    self.console("[bt %2d] 0x%x %s+0x%x"
+                                 % (nfr, ret, (nm or "?")[:48],
+                                    ret - (sa or 0)))
+                    nfr += 1
+                    if nxt <= fp:
+                        break
+                    fp = nxt
+            except Exception as e:
+                self.console("[null-call] bt failed %r" % (e,))
         name, saddr = self.nearest_symbol(addr)
         self.fatal("exec fetch fault at 0x%x (pc=0x%x) in %s+0x%x"
                    % (addr, self.reg_pc(), name or "?",
@@ -1783,7 +1835,10 @@ class FNLoader:
             self.stop_reason = None
             wall0 = time.time()
             try:
-                self.uc.emu_start(t.pc, 0, 2_000_000, self.slice_instr)
+                # until=1 (never reached): a PC=0 branch must FAULT so
+                # on_fetch() can capture the caller live instead of the
+                # silent emu_stop that clobbers the evidence.
+                self.uc.emu_start(t.pc, 1, 2_000_000, self.slice_instr)
             except UcError as e:
                 self.fatal("unicorn error %s (pc=0x%x, cur=%r)"
                            % (e, self.reg_pc(), t))
