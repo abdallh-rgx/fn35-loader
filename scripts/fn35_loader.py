@@ -298,6 +298,15 @@ class FNLoader:
         line = str(msg).rstrip()
         self.ring.append(line)
         self._last_console_wall = time.time()
+        # pak-mount milestone: arm the lastmile ring so the crash that
+        # follows lands with full instruction history
+        if "attempting to mount" in line and \
+                not getattr(self, "_pak_lm_armed", False):
+            self._pak_lm_armed = True
+            try:
+                self.arm_lastmile_trace(2_000_000)
+            except Exception:
+                pass
         if self.live_log:
             try:
                 print(line, flush=True)
