@@ -822,6 +822,15 @@ class FNLoader:
         # verification "passes", boot continues.
         (0x10136d094, b"\x29\x00\x00\x14",
          "global-shader verify fatal -> skip (b 0x10136d138)"),
+        # THE verify loop itself (~0x102357600): each entry calls a
+        # vtable[0x150] probe; w0!=0 means "problem", and the error path
+        # FIRST does FMsg::Logf (x4="Missing global shader %s...", verb
+        # =Fatal, which routes to FOutputDeviceError -> RequestExit(1)
+        # -> abort) and only THEN calls the assert helper above. Patch
+        # the "cbz w0, 0x1023577fc" at 0x10235772c into an unconditional
+        # "b 0x1023577fc": every entry takes the "no problem" path.
+        (0x10235772c, b"\x34\x00\x00\x14",
+         "verify-loop missing-detect -> always fine (b 0x1023577fc)"),
     ]
 
     def apply_code_patches(self):
