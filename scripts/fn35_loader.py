@@ -1136,6 +1136,66 @@ class FNLoader:
             self.console("[dbg] hook_mem_invalid raised %r" % (e,))
             raise
 
+    def arm_lastmile_trace(self, n=1_500_000):
+        """Bounded per-instruction ring, armed at a console milestone.
+        When a fault hits, the last instructions are disassembled to
+        reveal the exact branch that went wrong."""
+        from unicorn import UC_HOOK_CODE
+        try:
+            self._lm_ring = deque(maxlen=n)
+            self._lm_hook = self.uc.hook_add(
+                UC_HOOK_CODE, self._lm_hook_fn)
+            self.console("[lm-trace] armed ring of %d instructions" % n)
+        except Exception as e:
+            self.console("[lm-trace] arm failed: %r" % (e,))
+
+    def _lm_hook_fn(self, uc, addr, size, user):
+        try:
+            self._lm_ring.append(
+                (addr, uc.reg_read(a64.UC_ARM64_REG_SP),
+                 uc.reg_read(a64.UC_ARM64_REG_LR)))
+        except Exception:
+            pass
+
+    def dump_lastmile(self, count=80):
+        ring = getattr(self, "_lm_ring", None)
+        if not ring:
+            return
+        try:
+            import capstone
+            md = capstone.Cs(capstone.CS_ARCH_ARM64,
+                             capstone.CS_MODE_ARM)
+            ents = list(ring)[-count:]
+            # collapse runs of the same pc (loops) but keep order
+            self.console("[lastmile] %d of %d instructions before fault:"
+                         % (len(ents), len(ring)))
+            for i, (pc, sp, lr) in enumerate(ents):
+                tag = ""
+                if sp == 0:
+                    tag += "  <<< SP ZERO"
+                if lr == 0:
+                    tag += "  <<< LR ZERO"
+                try:
+                    code = self.rdb(pc, 4)
+                    for ins in md.disasm(code, pc):
+                        tag = "  %-8s %-36s" % (ins.mnemonic,
+                                                ins.op_str) + tag
+                        break
+                except Exception:
+                    tag = "  %-44s" % "(unreadable)" + tag
+                nm, sa = self.nearest_symbol(pc)
+                self.console("[lm %3d] 0x%x %s (%s+0x%x)"
+                             % (i, pc, tag, (nm or "?")[:30],
+                                pc - (sa or 0)))
+            # first occurrence of sp==0
+            for i, (pc, sp, lr) in enumerate(ring):
+                if sp == 0:
+                    self.console("[lastmile] FIRST SP==ZERO at #%d "
+                                 "(0x%x)" % (i, pc))
+                    break
+        except Exception as e:
+            self.console("[lastmile] dump failed: %r" % (e,))
+
     def on_fetch(self, addr):
         # with the stub farm mapped + svc dispatch, this only fires on
         # genuine unmapped execution -- a real crash
@@ -1154,6 +1214,7 @@ class FNLoader:
                              "[null-call] sp=0x%x" % sp)
             except Exception:
                 pass
+            self.dump_lastmile()
             try:
                 xs = " ".join("x%d=0x%x" % (i, self.reg_x(i))
                               for i in range(9))

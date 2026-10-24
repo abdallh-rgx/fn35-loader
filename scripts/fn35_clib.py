@@ -895,6 +895,17 @@ def _fgets(l, buf, n, fp):
 def _nslog(l, fmt):
     txt = fmt_engine(l.gcstr(fmt), RegSrc(l, 1))
     l.console("NSLog: " + txt)
+    # ---- trigger the last-mile instruction trace -----------------
+    # the PC=0/sp=0 null-call happens shortly after the pipeline-cache
+    # warning; switch on a bounded instruction ring right here so the
+    # fault dump shows the exact branch that went to NULL.
+    try:
+        if "Failed to open default shader pipeline cache" in txt \
+                and not getattr(l, "_trace_armed", False):
+            l._trace_armed = True
+            l.arm_lastmile_trace(1_500_000)
+    except Exception:
+        pass
     return 0
 
 
