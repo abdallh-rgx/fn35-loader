@@ -1119,6 +1119,30 @@ class FNLoader:
                 self.console("[null-call] %s" % xs)
             except Exception:
                 pass
+            # poor-man's backtrace: scan the stack for return addresses
+            # (image-range qwords) -- works even when fp/lr are zeroed
+            try:
+                sp = self.uc.reg_read(a64.UC_ARM64_REG_SP)
+                self.console("[null-call] stack scan from sp=0x%x:" % sp)
+                found = 0
+                for off in range(0, 0x400, 8):
+                    v = self.rd64(sp + off)
+                    if 0x100000000 <= v < 0x106000000:
+                        nm, sa = self.nearest_symbol(v)
+                        self.console("[stack +0x%03x] 0x%x %s+0x%x"
+                                     % (off, v, (nm or "?")[:44],
+                                        v - (sa or 0)))
+                        found += 1
+                        if found >= 20:
+                            break
+                if not found:
+                    self.console("[null-call] no image ptrs on stack; "
+                                 "raw dump:")
+                    for off in range(0, 0x100, 8):
+                        self.console("[stack +0x%03x] 0x%016x"
+                                     % (off, self.rd64(sp + off)))
+            except Exception as e:
+                self.console("[null-call] stack scan failed %r" % (e,))
             try:
                 import capstone
                 md = capstone.Cs(capstone.CS_ARCH_ARM64,
@@ -2991,6 +3015,15 @@ def main():
             import traceback
             traceback.print_exc()
             print("[fn35] snapshot save failed: %r" % (e,))
+    elif snapdir and l.fatal_msg:
+        # crash snapshot for offline analysis (registers/stack intact)
+        try:
+            import fn35_snap
+            fn35_snap.save_snapshot(
+                l, snapdir + "_crash",
+                note="crash: %s" % str(l.fatal_msg)[:160])
+        except Exception:
+            pass
 
     out = os.path.join(base, "download/fn35/fn35_boot_report.txt")
     os.makedirs(os.path.dirname(out), exist_ok=True)
