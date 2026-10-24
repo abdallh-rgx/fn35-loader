@@ -1158,8 +1158,16 @@ class FNLoader:
             self._lm_hook = self.uc.hook_add(
                 UC_HOOK_CODE, self._lm_hook_fn)
             self._lm_flush_pending = True
+            # cut the current slice NOW: the flush must happen at the
+            # slice boundary (mid-emulation ctl_remove_cache cannot
+            # invalidate already-chained blocks). emu_stop from a hook
+            # is safe -- the scheduler will resume the thread after.
+            try:
+                self.uc.emu_stop()
+            except Exception:
+                pass
             self.console("[lm-trace] armed ring of %d instructions "
-                         "(TB flush deferred to next slice boundary)" % n)
+                         "(slice cut, TB flush at boundary)" % n)
         except Exception as e:
             self.console("[lm-trace] arm failed: %r" % (e,))
 
@@ -2408,6 +2416,13 @@ class FNLoader:
     def sys_fstat(self, fd, st_addr):
         ent = self.fds.get(fd)
         if not ent:
+            # ALWAYS zero the struct on failure: an unfilled stat
+            # buffer hands the caller raw stack garbage (the "Requested
+            # read of <stack-addr> bytes" LogFileManager storm).
+            try:
+                self.wrb(st_addr, b"\x00" * 128)
+            except Exception:
+                pass
             return -9
         if ent[0] == "file":
             host = ent[2]
@@ -2619,7 +2634,12 @@ def _open_fn(l, path, flags, mode=0):
         l.console("[open2 t=%.3f] %r flags=0x%x host=%r exists=%s"
                   % (time.time() % 1000, pth, flags, host,
                      _o.path.exists(host) if host else None))
-    return l.sys_open(pth, flags, mode)
+    rv = l.sys_open(pth, flags, mode)
+    # POSIX C convention: open() returns -1 on failure (NOT -errno).
+    # Returning -2 (= -ENOENT) let the engine store it as a VALID fd
+    # (fstat(-2)/close(-2) on an unopened file) and read an unfilled
+    # stat struct -> stack garbage sizes -> memory corruption crash.
+    return -1 if rv < 0 else rv
 
 
 @cfunc("_close")
@@ -2629,22 +2649,26 @@ def _close_fn(l, fd):
 
 @cfunc("_read")
 def _read_fn(l, fd, buf, n):
-    return l.sys_read(fd, buf, n)
+    rv = l.sys_read(fd, buf, n)
+    return -1 if rv < 0 else rv
 
 
 @cfunc("_write", "_write_nocancel", "_writev")
 def _write_fn(l, fd, buf, n):
-    return l.sys_write(fd, buf, n)
+    rv = l.sys_write(fd, buf, n)
+    return -1 if rv < 0 else rv
 
 
 @cfunc("_lseek", "_lseek64", "_lseek_darwin")
 def _lseek_fn(l, fd, off, whence):
-    return l.sys_lseek(fd, off, whence)
+    rv = l.sys_lseek(fd, off, whence)
+    return -1 if rv < 0 else rv
 
 
 @cfunc("_pread", "_pread64")
 def _pread_fn(l, fd, buf, n, off):
-    return l.sys_pread(fd, buf, n, off)
+    rv = l.sys_pread(fd, buf, n, off)
+    return -1 if rv < 0 else rv
 
 
 @cfunc("_ftruncate", "_fsync", "_fdatasync", "_sync", "_dup", "_dup2",
@@ -2717,16 +2741,8 @@ def _stat_fn(l, path, out):
 
 @cfunc("_fstat", "_fstat64")
 def _fstat_fn(l, fd, out):
-    ent = l.fds.get(fd)
-    if not ent:
-        return -9
-    if ent[0] == "file":
-        host = ent[2]
-    elif ent[0] == "dir":
-        host = ent[1]
-    else:
-        return 0
-    return l._pack_stat(out, host)
+    rv = l.sys_fstat(fd, out)
+    return -1 if rv < 0 else rv
 
 
 @cfunc("_getdirentries", "_getdirentries64")
