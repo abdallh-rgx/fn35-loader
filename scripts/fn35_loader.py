@@ -2779,14 +2779,26 @@ class FNLoader:
         MAP_ANON = 0x1000
         p = self.mmap_alloc(length)
         if _os.environ.get("FN35_LOG_MMAP"):
-            self.console("[sys-mmap] len=0x%x -> 0x%x fd=%d"
-                         % (length, p, fd))
+            self.console("[sys-mmap] len=0x%x -> 0x%x fd=%d off=0x%x"
+                         % (length, p, fd, offset))
         if not (flags & MAP_ANON):
             ent = self.fds.get(fd)
             if ent and ent[0] == "file":
-                data = ent[1].read(min(length, 1 << 24))
-                if data:
-                    self.wrb(p, data)
+                # CRITICAL FIX 2025-10-25: honour the mmap OFFSET (the
+                # old code read from the fd's CURRENT position and also
+                # capped at 16 MB). The engine maps PNG/asset slices at
+                # non-zero offsets; reading from the wrong file position
+                # produced IHDR CRC errors on perfectly valid files.
+                # POSIX mmap also must NOT move the fd's file position,
+                # so save/restore it.
+                pos0 = ent[1].tell()
+                try:
+                    ent[1].seek(offset)
+                    data = ent[1].read(min(length, 1 << 28))
+                    if data:
+                        self.wrb(p, data)
+                finally:
+                    ent[1].seek(pos0)
         return p
 
     def sys_sysctl(self, namep, count, oldp, oldlenp):
