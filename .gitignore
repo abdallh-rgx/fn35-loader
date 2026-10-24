@@ -17,3 +17,5 @@ fn35/mfpage.html
 fn35/pak_index.json
 fn35/*.log
 fn35/*.txt
+.env
+fn35/
