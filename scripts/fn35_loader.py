@@ -907,6 +907,64 @@ class FNLoader:
                 self.console("[patch] FAILED %s: %r" % (desc, e))
         # dynamic keystone-assembled guards (need a code cave)
         self.install_weakobj_guard()
+        self.install_event_wait_guard()
+
+    def install_event_wait_guard(self):
+        """FGraphEvent-style Wait deadlock breaker.
+
+        The wait loop at 0x101018fe8 (vtable slot of the task-event
+        object) NEVER exits unless [this+0x98] is triggered; the 0.2s
+        timeout handler just requeues. If the completing party never
+        runs (splash asset failure / task-graph stall) every engine
+        thread ends up spinning here forever (segCB/CD: 8 threads,
+        billions of instructions, zero progress).
+
+        Patch the timeout path (0x101019038, entered with d0=elapsed
+        seconds already known > timeout): if elapsed > 120s give up
+        and return 0 ("event fired") so the engine keeps moving."""
+        try:
+            import keystone
+        except ImportError:
+            self.warn("event-wait guard: keystone missing, skipped")
+            return
+        ks = keystone.Ks(keystone.KS_ARCH_ARM64,
+                         keystone.KS_MODE_LITTLE_ENDIAN)
+        CAVE = self.WEAKOBJ_CAVE + 0x80          # same RWX page
+        try:
+            self.uc.mem_map(self.WEAKOBJ_CAVE, 0x1000, 7)
+        except UcError:
+            pass
+        asm = ("movz x4, #0\n"
+               "movk x4, #0x405E, lsl #48\n"       # x4 = 120.0 (double)
+               "fmov d3, x4\n"
+               "fcmp d0, d3\n"
+               "b.le 0x%x\n"                        # within 120s -> normal
+               "mov w0, #0\n"                       # give up: pretend ok
+               "ldp x29, x30, [sp, #0x20]\n"
+               "ldp x20, x19, [sp, #0x10]\n"
+               "ldp d9, d8, [sp], #0x30\n"
+               "ret\n"
+               "mov x0, x19\n"
+               "bl 0x101391084\n"                   # original timeout hdlr
+               "b 0x10101904c"                      # back into the loop
+               % (CAVE + 0x28,))
+        enc, _ = ks.asm(asm, addr=CAVE)
+        body = bytes(enc)
+        if len(body) != 52:
+            self.console("[wait-guard] BAD ASSEMBLY len=%d" % len(body))
+            return
+        try:
+            self.wrb(CAVE, body)
+            red, _ = ks.asm("b 0x%x" % CAVE, addr=0x101019038)
+            self.wrb(0x101019038, bytes(red))
+            self.uc.ctl_remove_cache(0x101019000, 0x10101a000)
+            self.uc.ctl_remove_cache(self.WEAKOBJ_CAVE,
+                                      self.WEAKOBJ_CAVE + 0x1000)
+            self._wait_giveup_arm = time.time()
+            self.console("[wait-guard] armed: Wait>120s -> return 0 "
+                         "(cave 0x%x)" % CAVE)
+        except Exception as e:
+            self.console("[wait-guard] FAILED: %r" % (e,))
 
     # ---- FWeakObjectPtr poison guard --------------------------------
     # ObjectIndexToObject() has TWO identical clones
