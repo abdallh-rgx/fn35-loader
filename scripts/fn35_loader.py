@@ -2390,6 +2390,15 @@ class FNLoader:
         # ObjC metadata (classes/methods) BEFORE link: ghost class binds
         self.objc.boot()
 
+        # Metal shim (opt-in; default stays nil-device so the GL chain
+        # is never destabilized): Z3-verified safe-Rust Metal via ctypes
+        if os.environ.get("FN35_METAL"):
+            try:
+                import fn35_metal
+                fn35_metal.install_ghost_classes(self)
+            except Exception as e:
+                self.console("[metal] ghost classes failed: %r" % (e,))
+
         # link image
         n_slots, n_binds = self.link()
         # ---- populate __DefaultRuneLocale (Darwin rune table) ---------

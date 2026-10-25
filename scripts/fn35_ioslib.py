@@ -937,6 +937,16 @@ _reg_gl()
 @cfunc("_MTLCreateSystemDefaultDevice")
 def _mtl_device(l):
     l.trace_gl("MTLCreateSystemDefaultDevice", (0,))
+    if os.environ.get("FN35_METAL"):
+        try:
+            import fn35_metal
+            h = fn35_metal.make_system_default_device(l)
+            if h:
+                l.console("[metal] system default device via Rust shim"
+                          " (ghost 0x%x)" % h)
+                return h
+        except Exception as e:
+            l.warn("[metal] device creation failed: %r" % (e,))
     return 0  # nil device -> UE4 logs failure
 
 
