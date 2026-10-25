@@ -803,6 +803,24 @@ def _printf(l, fmt):
             not getattr(l, "_uproj_dumped", False):
         l._uproj_dumped = True
         try:
+            ring = getattr(l, "_lm_ring", None)
+            if ring:
+                l.console("[proj-lm] last 45 instructions:")
+                import capstone as _cs
+                _md = _cs.Cs(_cs.CS_ARCH_ARM64, _cs.CS_MODE_ARM)
+                for pc, sp, lr in list(ring)[-45:]:
+                    nm2, sa2 = l.nearest_symbol(pc)
+                    try:
+                        _d = next(_md.disasm(
+                            bytes(l.rdb(pc, 4)), pc), None)
+                        ins = ("%s %s" % (_d.mnemonic, _d.op_str)
+                               if _d else "?")
+                    except Exception:
+                        ins = "?"
+                    l.console("  [plm] 0x%x %-22s %s+0x%x%s"
+                              % (pc, ins[:22],
+                                 (nm2 or "?")[:34], pc - (sa2 or 0),
+                                 "  SP0!" if sp == 0 else ""))
             l.console("[PROJ-FAIL] stack scan:")
             sp = l.reg_sp()
             for off in range(0, 0x300, 8):

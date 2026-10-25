@@ -150,6 +150,12 @@ def save_snapshot(l, snapdir, note=""):
     # as variadic back when it was an unimplemented import) resurrects
     # on restore and mis-calls NEW implementations with 9 args.
     state.pop("_arity", None)
+    # transient trace-arming flags: a resumed process must re-arm its
+    # lastmile rings / one-shot dumps itself (the ring contents are
+    # host-side objects that cannot survive pickling anyway)
+    for _fl in ("_kernproc_lm_armed", "_pak_lm_armed", "_uproj_dumped",
+                "_specz_logged", "_pak_served"):
+        state.pop(_fl, None)
     for k in _DROP:
         state[k] = None
     state["fds"] = _ser_fds(l)

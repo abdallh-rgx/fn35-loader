@@ -1112,6 +1112,20 @@ class FNLoader:
                     os.environ["FN35_TRACE_FD"].split(",") if x.strip())
             except ValueError:
                 self._trace_fds = None
+        # PERMANENT SYNC HOOK (the TCG-desync fix): unicorn 2.1.4 leaves
+        # lazily-committed register state when NO code hook is active;
+        # the CRC/AES tables then fault at addresses arithmetically
+        # impossible from the dumped regs (run88/91/92 vs 87/93 A/B test:
+        # crash ONLY without a per-instruction hook). A minimal per-inst
+        # reg read forces the sync and the crashes vanish. Ring kept
+        # small; disable with FN35_NO_SYNC_HOOK=1 for speed tests.
+        if not os.environ.get("FN35_NO_SYNC_HOOK"):
+            try:
+                self.arm_lastmile_trace(400_000)
+                self.console("[sync-hook] permanent per-instruction "
+                             "sync hook armed (TCG desync fix)")
+            except Exception as e:
+                self.console("[sync-hook] arm failed: %r" % (e,))
         self.uc.hook_add(UC_HOOK_INTR, self.hook_intr)
         self.uc.hook_add(UC_HOOK_MEM_INVALID, self.hook_mem_invalid)
         # ---- compatibility patches (touchHLE-style) -----------------
@@ -3617,6 +3631,13 @@ def main():
                 trace_n=trace_n, live_log=live)
             resume = True
             print("[fn35] RESUMED from snapshot: %s" % snapdir)
+            if os.environ.get("FN35_LM_ON_RESUME"):
+                # arm the lastmile immediately: the resumed window can
+                # crash before any console milestone re-arms it
+                try:
+                    l.arm_lastmile_trace(2_000_000)
+                except Exception as e:
+                    print("[fn35] lm arm failed: %r" % (e,))
         except Exception as e:
             import traceback
             traceback.print_exc()
