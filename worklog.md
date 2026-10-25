@@ -62,3 +62,47 @@ Key numbers:
 - main() = 0x102DAE84C • GOT 2,581 • 773 mod_inits • 43 svc sites
 - verify fn = 0x1023575d4 (no-op'd) • assert helper = 0x10136d04c
 - name-pool singleton = [0x1055d64e0] • chunk table seen at 0x64000048faf0
+
+---
+Task ID: segBV-CW (2025-10-25 session 2)
+Agent: main (Z.ai)
+Task: GitHub backup + CRITICAL bug hunt toward the login screen
+
+Work Log:
+- GitHub: repo abdallh-rgx/fn35-loader (public) — cleaned history with
+  git-filter-repo, ~40 commits this session, all pushed via
+  scripts/git_save.sh ("line-by-line" autosave per user request)
+- weakobj guard (cave patch): both ObjectIndexToObject clones
+  (0x102def960 + 0x1028eb2f8) range-check chunk + NULL -> return 0
+- **RETAA KILLER**: the verify patch bytes c0 03 9f d6 are RETAA —
+  unicorn 2.1.4 mis-executes it to PC=0/SP=0 (proved in isolation);
+  fixed to plain RET c0 03 5f d6
+- scheduler: wake past-due timed waiters EVERY loop iteration
+  (advance_clock only ran in the idle path; a busy-ready thread
+  starved all cond_timedwait sleepers — the segBX/BZ "silent phase")
+- **SNAPSHOT OVERLAY PERF**: merged-region bulk map (4125 regions -> 9,
+  ~355s -> <1s restore)
+- **NSString unicode normalization identity** (precomposedString/
+  decomposedString/folding): was unimplemented -> nil returns ->
+  the engine retried its FText build FOREVER (the 20B-instruction
+  "string storm"); identity return breaks the loop
+- heartbeat watchdog (30s) with thread/memory footprint
+- png read forensics: every served PNG verified byte-identical in
+  guest memory (IHDR-part-OK); "CRC error" is computed by guest code
+  on VALID data; errors are non-fatal (engine continues)
+- mmap FIX: honour the offset param + don't move fd position
+- **NZCV CRITICAL**: condition flags were NOT saved/restored on thread
+  switches; a slice ending between cmp and b.cc let the next thread's
+  flags hijack the branch -> intermittent random crashes with garbage
+  x8/x16 in bit-loops (3 different sites, different values each run)
+- getspecific: self-linked TLS stand-in for unset keys (NULL-deref
+  crash on key 10 after pak-index decode; [tls+field] chains)
+
+Stage Summary:
+- Frontier: engine now mounts pakchunkearly-iosclient.pak, decodes its
+  index, and dies in a 24-byte-entry table lookup ([x0+8] with x0 from
+  a half-initialized chunk table) — new territory, way past the old
+  CoreUObject/string-storm frontiers
+- Every fix committed+pushed to GitHub (abdallh-rgx/fn35-loader)
+- Next: the 24B-entry table (likely the pak-primed name/object table)
+  needs its chunk pointers populated — trace who fills [table+0x108]
