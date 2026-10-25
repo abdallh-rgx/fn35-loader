@@ -1,0 +1,7 @@
+[workspace]
+resolver = "2"
+members = ["fn35-metal", "fn35-metal-ffi"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"

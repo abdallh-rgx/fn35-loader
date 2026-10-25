@@ -1,0 +1,13 @@
+[package]
+name = "fn35-metal-ffi"
+version = "0.1.0"
+edition = "2021"
+description = "C ABI (cdylib) boundary over the safe fn35-metal core: libfn35_metal_ffi.so"
+license = "MIT"
+
+[lib]
+name = "fn35_metal_ffi"
+crate-type = ["cdylib"]
+
+[dependencies]
+fn35-metal = { path = "../fn35-metal" }
