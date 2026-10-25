@@ -1,9 +1,9 @@
 #!/bin/bash
-# one_seg.sh — run exactly ONE loader segment locally with the same
-# crash-recovery logic as the chain, then print the summary line.
-# (The sandbox reaps background processes between tool calls, so the
-# long chain runs on GitHub Actions; this keeps a local segment going
-# in parallel, one 10-min tool call at a time.)
+# one_seg.sh — run exactly ONE loader segment locally with crash-recovery.
+# Improvements over chainlong:
+#  * crash counter resets when the crash PC CHANGES (progress, not a loop)
+#  * BLOCK sync once past the init table (didFinishLaunching seen) - the
+#    6.5x VM-grind speedup; CODE only needed for inits 0-253
 cd /home/z/my-project/scripts
 export LD_LIBRARY_PATH=/home/z/mesa-debs/root/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 export FN35_SYNC_HOOK=auto
@@ -12,7 +12,13 @@ export FN35_SNAPSHOT=/home/z/my-project/fn35/snap
 F35=/home/z/my-project/fn35
 CONSOLE=$F35/chain_console.log
 CRASHES_FILE=$F35/.chain_crashes
-[ -f "$F35/snap/index.json" ] && export FN35_SYNC_HOOK=block
+CRASHPC_FILE=$F35/.chain_crashpc
+
+# past the init table? (any recent log saw didFinishLaunching) -> BLOCK
+if ls -t "$F35"/loc_*.log 2>/dev/null | head -3 | xargs grep -l "didFinishLaunching" 2>/dev/null | grep -q .; then
+  export FN35_SYNC_HOOK=block
+fi
+
 LOG=$F35/loc_$(date +%m%d_%H%M%S).log
 timeout 575 python3 -u fn35_loader.py > "$LOG" 2>&1
 RC=$?
@@ -24,10 +30,21 @@ if ls /home/z/my-project/download/fn35/screenshots/*.png >/dev/null 2>&1; then
   echo "[local] *** FRAMES RENDERED — screenshots in download/fn35/screenshots"
 fi
 if grep -q "FATAL" "$LOG"; then
-  C=$(cat "$CRASHES_FILE" 2>/dev/null || echo 0); C=$((C+1)); echo $C > "$CRASHES_FILE"
+  # crash PC fingerprint: different PC = progress, reset the counter
+  NEWPC=$(grep -aoE "fault at 0x[0-9a-f]+ .*pc=0x[0-9a-f]+" "$LOG" | head -1 | grep -oE "pc=0x[0-9a-f]+")
+  OLDCPC=$(cat "$CRASHPC_FILE" 2>/dev/null)
+  C=$(cat "$CRASHES_FILE" 2>/dev/null || echo 0)
+  if [ "$NEWPC" != "$OLDCPC" ] && [ -n "$NEWPC" ]; then
+    echo "$NEWPC" > "$CRASHPC_FILE"
+    C=1
+    echo "[local] new crash pc $NEWPC (progress) - counter reset" | tee -a "$CONSOLE"
+  else
+    C=$((C+1))
+  fi
+  echo $C > "$CRASHES_FILE"
   if [ -f "$F35/snap_crash/index.json" ]; then
-    if [ "$C" -ge 3 ]; then
-      echo "[local] crash-loop x$C -> ROLLBACK to last good" | tee -a "$CONSOLE"
+    if [ "$C" -ge 5 ]; then
+      echo "[local] stuck at same pc x$C -> ROLLBACK to last good" | tee -a "$CONSOLE"
       rm -rf "$F35/snap" "$F35/snap_crash"
       [ -f "$F35/snap_good/index.json" ] && cp -r "$F35/snap_good" "$F35/snap"
       echo 0 > "$CRASHES_FILE"

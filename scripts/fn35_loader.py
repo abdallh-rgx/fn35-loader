@@ -1480,11 +1480,62 @@ class FNLoader:
                 return True
             if self.try_desync_repair(uc, access, address, size):
                 return True
+            if self.poison_read_catch(uc, access, address, size):
+                return True
             self.diagnose_data_fault(access, address, size)
             return False
         except Exception as e:
             self.console("[dbg] hook_mem_invalid raised %r" % (e,))
             raise
+
+    # ------------------------------------------------------------------
+    # poison-read catch: a wild READ far outside every legit window is
+    # the other face of the TCG desync (stack-slot/register garbage).
+    # For the VM-grind's hash churn, answering such reads with a zero
+    # page is the same one-word corruption the crash-resume skip makes,
+    # but WITHOUT burning the remaining segment budget. Writes are NOT
+    # caught (a silent wild write could corrupt real state).
+    # ------------------------------------------------------------------
+    _poison_pages = 0
+
+    def poison_read_catch(self, uc, access, address, size):
+        try:
+            # unicorn 2.1.4: READ_UNMAPPED=19, READ_PROT=23
+            from unicorn import UC_MEM_READ_UNMAPPED, UC_MEM_READ_PROT
+            if access not in (UC_MEM_READ_UNMAPPED, UC_MEM_READ_PROT):
+                return False
+            # only catch truly-wild addresses: outside code+data
+            # [0x100000000,0x106000000), the stack window and the farm
+            if 0x100000000 <= address < 0x107000000:
+                return False                     # engine image (real fault)
+            if 0x500000000000 <= address < 0x800000000000:
+                return False                     # stack window
+            if 0x400000000000 <= address < 0x500000000000:
+                return False                     # stub farm
+            if address < 0x10000:
+                return False                     # zero page handles it
+            if FNLoader._poison_pages >= 400:
+                return False
+            page = address & ~0xFFF
+            if access == UC_MEM_READ_PROT:
+                try:
+                    uc.mem_protect(page, 0x1000, 3)   # grant RW
+                except UcError:
+                    return False
+            else:
+                try:
+                    uc.mem_map(page, 0x1000, 3)       # RW, no exec
+                except UcError:
+                    return False                     # overlaps something real
+            FNLoader._poison_pages += 1
+            if FNLoader._poison_pages <= 8 or \
+                    FNLoader._poison_pages % 200 == 0:
+                self.console("[poison-read] #%d zero-page @0x%x "
+                             "(pc=0x%x)" % (FNLoader._poison_pages,
+                                            page, self.reg_pc()))
+            return True
+        except Exception:
+            return False
 
     # ------------------------------------------------------------------
     # TCG-desync self-repair: unicorn 2.1.4 sometimes computes a data
