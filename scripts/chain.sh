@@ -4,9 +4,11 @@
 # unrecoverable garbage.
 cd /home/z/my-project/scripts
 export LD_LIBRARY_PATH=/home/z/mesa-debs/root/usr/lib/x86_64-linux-gnu
-export FN35_SYNC_HOOK=auto
-export FN35_BUDGET=430
-export FN35_SNAPSHOT=/home/z/my-project/fn35/snap3
+# snap is mid-VM-grind (past portrait + init table loops) -> BLOCK sync
+# hook directly (6.5x grind speedup; CODE only needed for init 0-253)
+export FN35_SYNC_HOOK=${FN35_SYNC_HOOK:-block}
+export FN35_BUDGET=${FN35_BUDGET:-430}
+export FN35_SNAPSHOT=${FN35_SNAPSHOT:-/home/z/my-project/fn35/snap}
 N=${1:-5}
 CRASHES=${CRASHES:-0}
 CRASHES_FILE=../fn35/.chain_crashes
@@ -22,25 +24,25 @@ for i in $(seq 1 $N); do
       # ended at budget AFTER a fatal? treat as crash only
       :
     fi
-    if [ -f ../fn35/snap3_crash/index.json ]; then
+    if [ -f ../fn35/snap_crash/index.json ]; then
       if [ $CRASHES -ge 3 ]; then
         echo "[chain] stuck in crash loop -> ROLLBACK to last good"
-        rm -rf ../fn35/snap3 ../fn35/snap3_crash
-        if [ -f ../fn35/snap3_good/index.json ]; then
-          cp -r ../fn35/snap3_good ../fn35/snap3
+        rm -rf ../fn35/snap ../fn35/snap_crash
+        if [ -f ../fn35/snap_good/index.json ]; then
+          cp -r ../fn35/snap_good ../fn35/snap
         fi
         CRASHES=0
       else
-        rm -rf ../fn35/snap3
-        mv ../fn35/snap3_crash ../fn35/snap3
+        rm -rf ../fn35/snap
+        mv ../fn35/snap_crash ../fn35/snap
         echo "[chain] crash #$CRASHES -> recovered from crash snapshot"
       fi
     fi
   else
     echo 0 > $CRASHES_FILE; CRASHES=0
-    if [ -f ../fn35/snap3/index.json ]; then
-      rm -rf ../fn35/snap3_good
-      cp -r ../fn35/snap3 ../fn35/snap3_good
+    if [ -f ../fn35/snap/index.json ]; then
+      rm -rf ../fn35/snap_good
+      cp -r ../fn35/snap ../fn35/snap_good
       MILES=$(grep -cE "didFinishLaunching|LogInit:|LogPakFile|LogRHI|portrait mode" $LOG 2>/dev/null)
       echo "[chain]   budget end; good snapshot saved (milestones this seg: $MILES)"
     fi
