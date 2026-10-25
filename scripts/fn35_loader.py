@@ -524,12 +524,21 @@ class FNLoader:
 
     def wreg_x(self, i, v):
         self.uc.reg_write(XREGS[i], v & MASK64)
+        # TCG-desync fix: reg_write inside a hook callback can sit in
+        # unicorn's deferred state while the current TB keeps executing
+        # with STALE register values (observed: CRC/AES table loops
+        # faulting at impossible addresses right after stub returns).
+        # Reading the register back forces the commit. Cheap: only on
+        # stub-call frequency, not per instruction.
+        self.uc.reg_read(XREGS[i])
 
     def wreg_sp(self, v):
         self.uc.reg_write(a64.UC_ARM64_REG_SP, v & MASK64)
+        self.uc.reg_read(a64.UC_ARM64_REG_SP)
 
     def wreg_pc(self, v):
         self.uc.reg_write(a64.UC_ARM64_REG_PC, v & MASK64)
+        self.uc.reg_read(a64.UC_ARM64_REG_PC)
 
     def wd0(self, f):
         d = getattr(a64, "UC_ARM64_REG_D0", None)
@@ -1112,18 +1121,26 @@ class FNLoader:
                     os.environ["FN35_TRACE_FD"].split(",") if x.strip())
             except ValueError:
                 self._trace_fds = None
-        # PERMANENT SYNC HOOK (the TCG-desync fix): unicorn 2.1.4 leaves
-        # lazily-committed register state when NO code hook is active;
-        # the CRC/AES tables then fault at addresses arithmetically
-        # impossible from the dumped regs (run88/91/92 vs 87/93 A/B test:
-        # crash ONLY without a per-instruction hook). A minimal per-inst
-        # reg read forces the sync and the crashes vanish. Ring kept
-        # small; disable with FN35_NO_SYNC_HOOK=1 for speed tests.
+        # GLOBAL SYNC HOOK (the TCG-desync fix): unicorn 2.1.4 leaves
+        # lazily-committed register state when no code hook is active;
+        # the CRC/AES table loops then fault at arithmetically impossible
+        # addresses (A/B verified repeatedly: crash WITHOUT any code hook,
+        # never with one -- zone hooks and commit-on-write readbacks did
+        # NOT suffice: the corruption accumulates outside the loops).
+        # An EMPTY global hook is the cheapest form: bench 8.7s vs 43s
+        # (1 reg read) vs 80s (lastmile-style) per 20M instructions.
+        # Disable with FN35_NO_SYNC_HOOK=1 (speed experiments only!).
         if not os.environ.get("FN35_NO_SYNC_HOOK"):
+            def _global_sync(uc, addr, size, user):
+                # ONE reg read per instruction is the minimum that
+                # forces unicorn's TCG to commit register state (empty
+                # hooks and zone hooks do NOT; bench: ~0.46M instr/s,
+                # ~10x slower than no-hook but the only correct mode)
+                uc.reg_read(a64.UC_ARM64_REG_SP)
             try:
-                self.arm_lastmile_trace(400_000)
-                self.console("[sync-hook] permanent per-instruction "
-                             "sync hook armed (TCG desync fix)")
+                self.uc.hook_add(UC_HOOK_CODE, _global_sync)
+                self.console("[sync-hook] global 1-read code hook armed "
+                             "(TCG desync fix)")
             except Exception as e:
                 self.console("[sync-hook] arm failed: %r" % (e,))
         self.uc.hook_add(UC_HOOK_INTR, self.hook_intr)
@@ -2243,6 +2260,10 @@ class FNLoader:
         if t.regs:
             for r, v in t.regs.items():
                 self.uc.reg_write(r, v & MASK64 if v is not None else 0)
+            # force-commit the whole restored context (TCG desync fix:
+            # deferred writes would let the resumed TB run with stale regs)
+            for r in t.regs:
+                self.uc.reg_read(r)
         self.cur = t
 
     def save_thread(self, t):
