@@ -1505,11 +1505,11 @@ class FNLoader:
 
     def try_desync_repair(self, uc, access, address, size):
         try:
-            if not os.environ.get("FN35_DSR"):
-                # DSR disabled by default: emu_stop from inside the
-                # fault callback leaves a UC_ERR_MAP loop on resume.
-                # The resume-time instruction skip (fn35_snap) handles
-                # the same crash class safely instead.
+            if os.environ.get("FN35_DSR", "1") == "0":
+                # opt-OUT only. DSR v2 uses the deferred-write pattern
+                # (reads in callback; reg/mem writes between slices —
+                # the same one the fetch-desync repair uses, verified
+                # live by test_fetchfix2 + repair #1 on 2026-10-25).
                 return False
             pc = self.reg_pc()
             if not (0x100000000 <= pc < 0x105900000):
@@ -1688,6 +1688,7 @@ class FNLoader:
                              "(%s %s) pc=0x%x"
                              % (FNLoader._dsr_count, action, address,
                                 true_addr, ins.mnemonic, ins.op_str, pc))
+            self._fetch_repair = True   # tolerate the slice-cut UcError
             try:
                 self.uc.emu_stop()       # cut slice; apply between slices
             except Exception:
@@ -1833,10 +1834,13 @@ class FNLoader:
                             if (a0 & 0x9F000000) == 0x90000000 \
                                     and (a0 & 0x1F) == 16 \
                                     and (a1 & 0xFFC00000) == 0xF9400000:
-                                pimm = ((a0 >> 5) & 0x7FFFF) << 12
-                                if pimm & (1 << 32):
-                                    pimm -= 1 << 33
-                                base = (stub & ~0xFFF) + pimm
+                                # adrp imm21 = immhi(19):immlo(2), signed
+                                immlo = (a0 >> 29) & 3
+                                immhi = (a0 >> 5) & 0x7FFFF
+                                i21 = (immhi << 2) | immlo
+                                if i21 & (1 << 20):
+                                    i21 -= 1 << 21
+                                base = (stub & ~0xFFF) + (i21 << 12)
                                 off = ((a1 >> 10) & 0xFFF) << 3
                                 slot = base + off
                                 v = _st.unpack("<Q", bytes(
@@ -1847,6 +1851,31 @@ class FNLoader:
                                     % (stub, slot, v,
                                        "  <-- REAL ZERO" if v == 0
                                        else "  <-- REGISTER DESYNC"))
+                                # IN-PROCESS DESYNC REPAIR: the bl already
+                                # set LR; jumping straight to the slot
+                                # value reproduces the intended call.
+                                # Tested: emu_stop here + PC rewrite
+                                # between slices keeps the Uc coherent
+                                # (test_fetchfix2.py).
+                                looks_code = (
+                                    0x100000000 <= v < 0x107000000
+                                    or 0x400000000000 <= v < 0x800000000000)
+                                if v != 0 and looks_code:
+                                    self._n_desync_fixes = getattr(
+                                        self, "_n_desync_fixes", 0) + 1
+                                    if self._n_desync_fixes <= 500:
+                                        self.console(
+                                            "[null-call] REPAIR #%d: "
+                                            "redirect pc -> 0x%x"
+                                            % (self._n_desync_fixes, v))
+                                        self._dsr_pending = {
+                                            "kind": "branch",
+                                            "target": v,
+                                            "pc": self.reg_pc(),
+                                        }
+                                        self._fetch_repair = True
+                                        self.uc.emu_stop()
+                                        return False
                     except Exception as e:
                         self.console("[null-call] slot walk failed: %r"
                                      % (e,))
@@ -2690,9 +2719,16 @@ class FNLoader:
                 # silent emu_stop that clobbers the evidence.
                 self.uc.emu_start(t.pc, 1, 2_000_000, self.slice_instr)
             except UcError as e:
-                self.fatal("unicorn error %s (pc=0x%x, cur=%r)"
-                           % (e, self.reg_pc(), t))
-                break
+                if getattr(self, "_fetch_repair", False):
+                    # in-process desync repair in flight: the fetch fault
+                    # was the planned stop; state is coherent, keep going
+                    self._fetch_repair = False
+                    self.console("[desync-fix] slice ended for repair; "
+                                 "continuing")
+                else:
+                    self.fatal("unicorn error %s (pc=0x%x, cur=%r)"
+                               % (e, self.reg_pc(), t))
+                    break
             except Exception as e:
                 self.fatal("hook exception %r (pc=0x%x)" % (e, self.reg_pc()))
                 break
@@ -2703,7 +2739,17 @@ class FNLoader:
             if _dsr is not None:
                 self._dsr_pending = None
                 try:
-                    if _dsr["kind"] == "load":
+                    if _dsr["kind"] == "branch":
+                        # fetch-desync repair: jump straight to the decoded
+                        # GOT target (the bl already set LR correctly)
+                        t.pc = _dsr["target"]
+                        t.regs[a64.UC_ARM64_REG_PC] = t.pc
+                        try:
+                            self.uc.reg_write(a64.UC_ARM64_REG_PC, t.pc)
+                        except Exception:
+                            pass
+                        self.console("[desync-fix] applied: pc=0x%x" % t.pc)
+                    elif _dsr["kind"] == "load":
                         import unicorn.arm64_const as _a
                         c = getattr(_a, "UC_ARM64_REG_"
                                     + _dsr["reg"].upper(), None)
