@@ -1104,6 +1104,14 @@ class FNLoader:
                              % (n, e))
 
     def install_hooks(self):
+        # targeted fd tracing (FN35_TRACE_FD=4,5) for pak-read forensics
+        if os.environ.get("FN35_TRACE_FD"):
+            try:
+                self._trace_fds = set(
+                    int(x) for x in
+                    os.environ["FN35_TRACE_FD"].split(",") if x.strip())
+            except ValueError:
+                self._trace_fds = None
         self.uc.hook_add(UC_HOOK_INTR, self.hook_intr)
         self.uc.hook_add(UC_HOOK_MEM_INVALID, self.hook_mem_invalid)
         # ---- compatibility patches (touchHLE-style) -----------------
@@ -2732,12 +2740,22 @@ class FNLoader:
 
     def sys_pread(self, fd, buf, count, offset):
         ent = self.fds.get(fd)
+        _tr = getattr(self, "_trace_fds", None)
+        if _tr and fd in _tr:
+            self.console("[fd%d] pread n=%d off=%d -> %s"
+                         % (fd, count, offset,
+                            "file" if ent and ent[0] == "file" else
+                            ("CLOSED/" + str(ent[0]) if ent else "NOENT")))
         if ent and ent[0] == "file":
             ent[1].seek(offset)
             data = ent[1].read(min(count, 1 << 24))
             if data:
                 self.wrb(buf, data)
                 self._png_trace(fd, buf, data, "pread@%d" % offset)
+            if _tr and fd in _tr:
+                self.console("[fd%d] pread -> %d bytes%s"
+                             % (fd, len(data),
+                                " EOF!" if len(data) < count else ""))
             return len(data)
         return -9
 
@@ -2904,6 +2922,16 @@ class FNLoader:
             nm = None
         val = sysctl_bytes(nm) if nm else None
         if val is None:
+            # kinfo_proc queries fire immediately before the project-file
+            # read failure -- arm the lastmile ring to capture the exact
+            # decision path (once)
+            if mib[:2] == (1, 14) and \
+                    not getattr(self, "_kernproc_lm_armed", False):
+                self._kernproc_lm_armed = True
+                try:
+                    self.arm_lastmile_trace(1_000_000)
+                except Exception:
+                    pass
             self.console("[kernel] sysctl mib=%s -> ENOENT" % (mib,))
             return -2
         avail = self.rd64(oldlenp) if oldlenp else 0
