@@ -38,8 +38,13 @@ from fn35_native import build_native_stubs
 import fn35_ioslib  # noqa: F401 -- registers implementations into IMPL
 import fn35_gles
 import fn35_objc    # noqa: F401 -- overrides the trace-grade ObjC stubs
+import fn35_zlib    # noqa: F401 -- zlib inflate/deflate for the pak index
 from fn35_ioslib import DATA_SYMS, sysctl_bytes, SYSCTL_BY_NAME
 from fn35_objc import ObjCRuntime
+
+# merge the zlib implementations into the master table (setdefault so
+# the loader's own IMPL entries, if any, win)
+fn35_zlib.register(IMPL)
 
 PAGE = 0x1000
 MASK64 = 0xFFFFFFFFFFFFFFFF
