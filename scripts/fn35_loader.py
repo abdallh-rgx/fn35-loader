@@ -1140,6 +1140,10 @@ class FNLoader:
         # An EMPTY global hook is the cheapest form: bench 8.7s vs 43s
         # (1 reg read) vs 80s (lastmile-style) per 20M instructions.
         # Disable with FN35_NO_SYNC_HOOK=1 (speed experiments only!).
+        # FN35_SYNC_HOOK=block: UC_HOOK_BLOCK + 1 reg read per BASIC
+        # BLOCK instead of per instruction (vm-grind speed experiment;
+        # every branch ends a TB, so this still flushes frequently).
+        _sh_mode = os.environ.get("FN35_SYNC_HOOK", "code")
         if not os.environ.get("FN35_NO_SYNC_HOOK"):
             def _global_sync(uc, addr, size, user):
                 # ONE reg read per instruction is the minimum that
@@ -1148,9 +1152,15 @@ class FNLoader:
                 # ~10x slower than no-hook but the only correct mode)
                 uc.reg_read(a64.UC_ARM64_REG_SP)
             try:
-                self.uc.hook_add(UC_HOOK_CODE, _global_sync)
-                self.console("[sync-hook] global 1-read code hook armed "
-                             "(TCG desync fix)")
+                if _sh_mode == "block":
+                    from unicorn import UC_HOOK_BLOCK
+                    self.uc.hook_add(UC_HOOK_BLOCK, _global_sync)
+                    self.console("[sync-hook] BLOCK 1-read hook armed "
+                                 "(TCG desync fix, block mode)")
+                else:
+                    self.uc.hook_add(UC_HOOK_CODE, _global_sync)
+                    self.console("[sync-hook] global 1-read code hook armed "
+                                 "(TCG desync fix)")
             except Exception as e:
                 self.console("[sync-hook] arm failed: %r" % (e,))
         self.uc.hook_add(UC_HOOK_INTR, self.hook_intr)
