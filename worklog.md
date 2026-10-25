@@ -164,3 +164,24 @@ Stage Summary:
   .uproject' (rename our pak's mount string?)
 - Key numbers: stub[1332]=_read, AES tables @0x104352d48/0x10333887c,
   grind=480-bit BigInt name-table build, pak idx @33.24-33.36MB
+
+---
+Task ID: env-restore (2026-10-25 session 4)
+Agent: main (Z.ai)
+Task: Environment recovery after sandbox reset; continue toward login screen
+
+Work Log:
+- Sandbox was reset at 10:06 (boot-timeline.log); /home/z/my-project was
+  rebuilt from git HEAD only
+- OLD session survived in /tmp/my-project: restored fn35/ (644MB:
+  FortniteClient 91MB, IPA, pak 33MB, segAJ snapshot, sandbox, tools,
+  run1-53 + segA-AJ logs) + 14 untracked analysis scripts
+- Reinstalled python env: unicorn 2.1.4, capstone, keystone, pyelftools
+- All 10 loader modules compile OK; binary md5 66130a44341bdebe767d0c8471f1c1cc
+- Committed + pushed restored scripts (4f046fe)
+- Launched segAK: fresh boot, FN35_BUDGET=1800, snapshot chain -> fn35/snap2
+
+Stage Summary:
+- Everything recovered; no progress lost (all session 2-3 fixes are in git)
+- segAK running; frontier expected: pak-layer .uproject read blocker
+  (session 3's REMAINING BLOCKER)
