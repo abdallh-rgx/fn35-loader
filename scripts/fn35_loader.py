@@ -1559,16 +1559,51 @@ class FNLoader:
                 base += idx
             true_addr = (base + m.disp) & MASK64
 
-            # PAIR-FOLD: the faulting load's base was often computed by
+            # PAIR-FOLD A: preceding 'and wD, wS, #imm' masking the INDEX
+            # register: the committed index is PRE-mask garbage when the
+            # mask's write didn't commit -- fold the mask back in
+            # (idempotent if the committed value was already masked).
+            try:
+                pre = bytes(uc.mem_read(pc - 4, 4))
+                pins = next(md.disasm(pre, pc - 4))
+            except StopIteration:
+                pins = None
+            except Exception:
+                pins = None
+
+            if pins is not None and pins.mnemonic in ("and", "ands") and \
+                    len(pins.operands) == 3 and \
+                    pins.operands[0].type == ARM64_OP_REG and \
+                    pins.operands[2].type == ARM64_OP_IMM and m.index:
+                from capstone.arm64 import ARM64_OP_REG as _R
+                dname = pins.reg_name(pins.operands[0].reg)
+                iname = ins.reg_name(m.index)
+                if dname == iname:
+                    imm = pins.operands[2].imm & 0xFFFFFFFF
+                    m2 = self._dsr_reg(uc, iname)
+                    try:
+                        sh2 = memop.shift.value
+                    except Exception:
+                        sh2 = 0
+                    addr2 = (self._dsr_reg(
+                        uc, ins.reg_name(m.base)) + ((m2 & imm) << sh2)
+                        + m.disp) & MASK64
+                    if addr2 != address and addr2 != true_addr:
+                        try:
+                            uc.mem_read(addr2, 1)
+                            true_addr = addr2
+                            self._dsr_folded = "and-mask"
+                        except Exception:
+                            pass
+
+            # PAIR-FOLD B: the faulting load's base was often computed by
             # the PRECEDING 'add Xt, Xn, Xm{, uxtw #s}' -- which may
             # itself have consumed the stale value (committed Xt is
             # then garbage). Recompute from the add's SOURCES instead
             # (they were committed before the desync window).
             pair_addr = None
             try:
-                pre = bytes(uc.mem_read(pc - 4, 4))
-                pins = next(md.disasm(pre, pc - 4))
-                if pins.mnemonic in ("add", "add x", "add w") and \
+                if pins is not None and pins.mnemonic == "add" and \
                         len(pins.operands) == 3 and \
                         pins.operands[1].type == ARM64_OP_REG and \
                         pins.operands[2].type == ARM64_OP_REG:
@@ -1586,8 +1621,6 @@ class FNLoader:
                             psh = 0
                         pidx <<= psh
                         pair_addr = (pbase + pidx + m.disp) & MASK64
-            except StopIteration:
-                pass
             except Exception:
                 pair_addr = None
 
