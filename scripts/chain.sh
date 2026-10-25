@@ -1,41 +1,49 @@
 #!/bin/bash
-# chain.sh [n_segments] — run the loader repeatedly:
-#   - budget end -> snapshot advances (normal chain)
-#   - random desync crash -> recover from the crash snapshot (the
-#     committed state is usually valid; the resume re-translates
-#     fresh TBs so the fault class typically does not re-fire)
-# Stops after 3 consecutive crashes with no progress.
+# chain.sh [n_segments] — auto-advancing loader chain with desync-crash
+# recovery AND rollback to the last good snapshot when a crash state is
+# unrecoverable garbage.
 cd /home/z/my-project/scripts
 export LD_LIBRARY_PATH=/home/z/mesa-debs/root/usr/lib/x86_64-linux-gnu
 export FN35_SYNC_HOOK=auto
-export FN35_BUDGET=440
+export FN35_BUDGET=430
 export FN35_SNAPSHOT=/home/z/my-project/fn35/snap3
 N=${1:-5}
-CRASHES=0
-PREV_INITS=0
+CRASHES=${CRASHES:-0}
+CRASHES_FILE=../fn35/.chain_crashes
+[ -f $CRASHES_FILE ] && CRASHES=$(cat $CRASHES_FILE)
 for i in $(seq 1 $N); do
   LOG=../fn35/ch_$(date +%H%M%S).log
-  timeout 545 python fn35_loader.py > $LOG 2>&1
+  timeout 540 python fn35_loader.py > $LOG 2>&1
   LAST=$(grep -E "stopped:" $LOG | tail -1)
-  echo "[chain] seg $i: $LAST"
+  echo "[chain] seg $i: ${LAST:0:130}"
   if grep -q "FATAL" $LOG; then
     CRASHES=$((CRASHES+1))
-    if [ -f ../fn35/snap3_crash/index.json ]; then
-      rm -rf ../fn35/snap3
-      mv ../fn35/snap3_crash ../fn35/snap3
-      echo "[chain] crash #$CRASHES -> recovered from crash snapshot"
+    if grep -q "stopped: reason=budget" $LOG; then
+      # ended at budget AFTER a fatal? treat as crash only
+      :
     fi
-    if [ $CRASHES -ge 3 ]; then
-      echo "[chain] 3 consecutive crashes -- stopping for analysis"
-      tail -5 $LOG | cut -c1-200
-      break
+    if [ -f ../fn35/snap3_crash/index.json ]; then
+      if [ $CRASHES -ge 3 ]; then
+        echo "[chain] stuck in crash loop -> ROLLBACK to last good"
+        rm -rf ../fn35/snap3 ../fn35/snap3_crash
+        if [ -f ../fn35/snap3_good/index.json ]; then
+          cp -r ../fn35/snap3_good ../fn35/snap3
+        fi
+        CRASHES=0
+      else
+        rm -rf ../fn35/snap3
+        mv ../fn35/snap3_crash ../fn35/snap3
+        echo "[chain] crash #$CRASHES -> recovered from crash snapshot"
+      fi
     fi
   else
-    CRASHES=0
+    echo 0 > $CRASHES_FILE; CRASHES=0
+    if [ -f ../fn35/snap3/index.json ]; then
+      rm -rf ../fn35/snap3_good
+      cp -r ../fn35/snap3 ../fn35/snap3_good
+      MILES=$(grep -cE "didFinishLaunching|LogInit:|LogPakFile|LogRHI|portrait mode" $LOG 2>/dev/null)
+      echo "[chain]   budget end; good snapshot saved (milestones this seg: $MILES)"
+    fi
   fi
-  # progress check: init count or milestone lines
-  INITS=$(grep -c "dyld\] init" $LOG 2>/dev/null || echo 0)
-  MILES=$(grep -cE "LogInit|didFinishLaunching|LogPakFile|portrait" $LOG 2>/dev/null || echo 0)
-  echo "[chain]   inits=+$INITS milestones=$MILES"
 done
 echo "[chain] done"

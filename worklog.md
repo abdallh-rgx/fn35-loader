@@ -214,3 +214,45 @@ Stage Summary:
   under emulation. Old runs passed the same code (run38 trace confirms)
 - Path forward: chain segments (~0.45M instr/s); expect [icu-stat] +
   LogInit once the VM finishes the launch blob
+
+---
+Task ID: desync-war (2025-10-25 session 4, continued)
+Agent: main (Z.ai)
+Task: Push through the VM grind to the login screen; survive the unicorn
+TCG-desync race
+
+Work Log:
+- segAU-AZ: reached the pak-mount frontier (LogPakFile + index reads
+  #1-9 = session-3's map reproduced exactly)
+- BLOCK sync hook: 6.5x faster than the per-instruction code hook
+  (VM grind 13MB bytecode done in ~2 segments vs ~15)
+- The engine's pak-phase AES/CRC table loops hit RANDOM TCG-desync
+  faults in BOTH hook modes, fresh OR resumed: committed registers
+  can hold garbage (x8=w8, add never executed). Unicorn 2.1.4 race.
+- segBF/BG: FN35_NO_ENGINE_PAK ENOENT gate on .pak paths broke early
+  inits (error paths through the same fragile loops) - removed
+- ROOT CAUSE of the project-check regression: session-3's cookeddata
+  uproject made the engine prepend the project path to the command
+  line -> project check -> relative-path read -> translate_path dead-
+  drops it into sandbox/System -> ENOENT -> "Failed to read file ->
+  engine will exit". run49's EMPTY command line skipped the check
+  entirely (LogInit: Command Line: was empty!). FIXED: uproject
+  moved away (backup: fn35/fortnitegame.uproject.hidden)
+- DSR (desync self-repair): works mathematically (and-mask folding)
+  but emu_stop from the fault callback leaves UC_ERR_MAP loops ->
+  disabled by default; kept for reference (FN35_DSR=1)
+- CRASH-RECOVERY CHAIN (chain.sh): budget-end saves good snapshots,
+  crashes auto-recover from crash snapshots (fresh TCB usually clears
+  the desync), 3x same-crash -> rollback to last good, crash counter
+  persisted across calls. The crash-resume poison-skip (+4 the
+  faulting load/store thread PC at restore time) is safe and helps.
+- Snapshot fixes: py_stack dropped on crash saves; unpicklable
+  sync-hook closures excluded (silent save failures killed recoveries)
+
+Stage Summary:
+- Chain grinding through inits (each recovery advances ~150-250 inits;
+  773 total, then portrait -> BLOCK swap -> VM grind ~2 segments ->
+  the physical-model project flow -> LogInit -> GL -> login screen)
+- Frontier known-good config: FN35_SYNC_HOOK=auto, NO NO_ENGINE_PAK,
+  uproject hidden, chain.sh for crash recovery
+- Everything pushed to abdallh-rgx/fn35-loader (~30 commits today)
