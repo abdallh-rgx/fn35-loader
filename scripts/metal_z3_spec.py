@@ -52,9 +52,9 @@ PHASES = ["P_DEAD", "P_CREATED", "P_ACTIVE", "P_COMMITTED",
 PHASE_RANK = {"P_DEAD": 0, "P_CREATED": 1, "P_ACTIVE": 2, "P_COMMITTED": 3,
               "P_SCHEDULED": 4, "P_COMPLETED": 5, "P_ERRORED": 5}
 
-OPS = ["OP_NOP", "OP_CB_NEW", "OP_ENCODE", "OP_COMMIT", "OP_TICK",
-       "OP_WAIT", "OP_BUF_NEW", "OP_BUF_WRITE", "OP_TEX_NEW",
-       "OP_TEX_WRITE", "OP_RELEASE", "OP_LIB_NEW"]
+OPS = ["OP_NOP", "OP_DEV_NEW", "OP_QUEUE_NEW", "OP_CB_NEW", "OP_ENCODE",
+       "OP_COMMIT", "OP_TICK", "OP_WAIT", "OP_BUF_NEW", "OP_BUF_WRITE",
+       "OP_TEX_NEW", "OP_TEX_WRITE", "OP_RELEASE", "OP_LIB_NEW"]
 
 KINDS = ["K_NONE", "K_DEVICE", "K_QUEUE", "K_CMDBUF",
          "K_BUFFER", "K_TEXTURE", "K_LIBRARY"]
@@ -106,6 +106,20 @@ def step_concrete(m: ModelState, op: str, h: int, off: int, ln: int,
     """
     OK, E_DEAD, E_PHASE, E_BOUNDS, E_KIND = 0, 1, 2, 3, 4
     live = m.kind[h] != "K_NONE"
+
+    if op == "OP_DEV_NEW":
+        if live:
+            return E_KIND          # slot must be free
+        m.kind[h] = "K_DEVICE"
+        return OK
+
+    if op == "OP_QUEUE_NEW":
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_DEVICE":
+            return E_KIND
+        m.kind[h] = "K_QUEUE"
+        return OK
 
     if op == "OP_CB_NEW":
         if not live:
@@ -345,30 +359,97 @@ def run_proofs():
     # Enumerate op sequences on the CONCRETE model; if any trace accepts an
     # encode at phase != ACTIVE, the spec is broken. Random + directed.
     rng = random.Random(0xC0FFEE)
-    ops_pool = ["OP_CB_NEW", "OP_ENCODE", "OP_COMMIT", "OP_TICK",
-                "OP_WAIT", "OP_BUF_NEW", "OP_BUF_WRITE", "OP_TEX_NEW",
-                "OP_TEX_WRITE", "OP_RELEASE", "OP_LIB_NEW", "OP_NOP"]
+    ops_pool = ["OP_DEV_NEW", "OP_QUEUE_NEW", "OP_CB_NEW", "OP_ENCODE",
+                "OP_COMMIT", "OP_TICK", "OP_WAIT", "OP_BUF_NEW",
+                "OP_BUF_WRITE", "OP_TEX_NEW", "OP_TEX_WRITE",
+                "OP_RELEASE", "OP_LIB_NEW", "OP_NOP"]
+    # slot preference: 70% pick a slot where the op is APPLICABLE
+    # (builds real DEV->QUEUE->CB->COMMIT->TICK chains), 30% adversarial
+    # random slots (drives the dead/kind rejection paths). Op order and
+    # integer args stay fully random/adversarial.
+    APPLICABLE = {
+        "OP_DEV_NEW": {"K_NONE"},
+        "OP_QUEUE_NEW": {"K_DEVICE"},
+        "OP_CB_NEW": {"K_QUEUE"},
+        "OP_LIB_NEW": {"K_DEVICE"},
+        "OP_BUF_NEW": {"K_DEVICE"},
+        "OP_TEX_NEW": {"K_DEVICE"},
+        "OP_BUF_WRITE": {"K_BUFFER"},
+        "OP_TEX_WRITE": {"K_TEXTURE"},
+        "OP_ENCODE": {"K_CMDBUF"}, "OP_COMMIT": {"K_CMDBUF"},
+        "OP_TICK": {"K_CMDBUF"}, "OP_WAIT": {"K_CMDBUF"},
+        "OP_RELEASE": {"K_DEVICE", "K_QUEUE", "K_CMDBUF", "K_BUFFER",
+                       "K_TEXTURE", "K_LIBRARY"},
+        "OP_NOP": set(),
+    }
+
+    def progressive_op(m, rng):
+        """Pick the op that ADVANCES the most-developed slot through its
+        lifecycle; used with prob ~0.55 so half the steps stay random/
+        adversarial (rejection paths still well covered)."""
+        RANK = ["K_NONE", "K_LIBRARY", "K_TEXTURE", "K_BUFFER",
+                "K_QUEUE", "K_CMDBUF", "K_DEVICE"]
+        best, best_rank = None, -1
+        for i in range(4):
+            r = RANK.index(m.kind[i]) if m.kind[i] in RANK else 0
+            if r > best_rank and m.kind[i] != "K_NONE":
+                best, best_rank = i, r
+        if best is None:
+            return "OP_DEV_NEW", rng.randrange(4)
+        k = m.kind[best]
+        if k == "K_DEVICE":
+            return rng.choice(["OP_QUEUE_NEW", "OP_BUF_NEW", "OP_TEX_NEW",
+                               "OP_LIB_NEW"]), best
+        if k == "K_QUEUE":
+            return "OP_CB_NEW", best
+        if k == "K_CMDBUF":
+            ph = m.phase[best]
+            if ph == "P_ACTIVE":
+                return rng.choice(["OP_ENCODE", "OP_ENCODE", "OP_COMMIT"]), best
+            if ph in ("P_COMMITTED", "P_SCHEDULED"):
+                return "OP_TICK", best
+            return rng.choice(["OP_WAIT", "OP_RELEASE"]), best
+        if k == "K_BUFFER":
+            return "OP_BUF_WRITE", best
+        if k == "K_TEXTURE":
+            return "OP_TEX_WRITE", best
+        return "OP_RELEASE", best
+
     n_viol, traces = 0, []
     for t in range(20000):
         m = ModelState(4)
         trace = []
         for _ in range(rng.randint(3, 14)):
-            op = rng.choice(ops_pool)
-            h = rng.randrange(4)
+            if rng.random() < 0.55:
+                op, h = progressive_op(m, rng)
+            else:
+                op = rng.choice(ops_pool)
+                kinds = APPLICABLE.get(op, set())
+                cand = [i for i in range(4)
+                        if m.kind[i] in kinds] if kinds else []
+                if cand and rng.random() < 0.5:
+                    h = rng.choice(cand)
+                else:
+                    h = rng.randrange(4)
             args = {k: rng.choice([0, 1, 2, 4, 8, 16, 64, 128, -1, 1000])
                     for k in ("off", "ln", "x", "y", "w", "ht", "lvl")}
             # OP_CB_NEW reuses h as queue->cmdbuf slot
+            phase_before = m.phase[h]
+            kind_before = m.kind[h]
             rc = step_concrete(m, op, h, args["off"], args["ln"], args["x"],
                                args["y"], args["w"], args["ht"], args["lvl"])
-            # P1: encode accepted => phase was ACTIVE
-            if op == "OP_ENCODE" and rc == 0 and m.phase[h] != "P_ACTIVE":
+            # P1: encode accepted => phase was ACTIVE at the call
+            if op == "OP_ENCODE" and rc == 0 and phase_before != "P_ACTIVE":
                 n_viol += 1
             # P3: buf write accepted => bounds hold
             if op == "OP_BUF_WRITE" and rc == 0 and \
                     not (0 <= args["off"] and args["off"] + args["ln"] <= m.buf_len[h]):
                 n_viol += 1
-            # P4: any op on a dead handle must be rejected
-            if rc == 0 and m.kind[h] == "K_NONE" and op != "OP_NOP":
+            # P4: access ops on a dead handle are always rejected
+            # (RELEASE legitimately ends dead; DEV_NEW allocates it;
+            #  NOP touches nothing)
+            if rc == 0 and m.kind[h] == "K_NONE" and \
+                    op not in ("OP_NOP", "OP_RELEASE", "OP_DEV_NEW"):
                 n_viol += 1
             trace.append((op, h, args, rc))
         traces.append(trace)
@@ -438,7 +519,18 @@ def emit_traces(traces, path, limit=300):
         out.append(steps)
     with open(path, "w") as f:
         json.dump(out, f)
-    print(f"[emit] wrote {len(out)} conformance traces -> {path}")
+    txt = path.replace(".json", ".txt")
+    with open(txt, "w") as f:
+        f.write(f"fn35-metal conformance v1 traces={len(out)}\n")
+        for steps in out:
+            f.write(f"T {len(steps)}\n")
+            for s in steps:
+                a = s["args"]
+                f.write(" ".join(str(v) for v in [
+                    s["op"], s["h"], a["off"], a["ln"], a["x"], a["y"],
+                    a["w"], a["ht"], a["lvl"], s["rc"], s["phase_after"],
+                    s["kind_after"], s["buf_len"]]) + "\n")
+    print(f"[emit] wrote {len(out)} conformance traces -> {path} (+ .txt)")
 
 
 if __name__ == "__main__":
