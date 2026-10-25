@@ -106,3 +106,61 @@ Stage Summary:
 - Every fix committed+pushed to GitHub (abdallh-rgx/fn35-loader)
 - Next: the 24B-entry table (likely the pak-primed name/object table)
   needs its chunk pointers populated — trace who fills [table+0x108]
+
+---
+Task ID: segCX-DH (2025-10-25 session 3)
+Agent: main (Z.ai)
+Task: Continue toward the login screen; GitHub line-by-line saves
+
+Work Log:
+- NEW TOKEN: ghp_2YUmcEX... working (user abdallh-rgx); repo synced
+  (fn35-loader, ~15 commits this session, all pushed)
+- TLS FIX: _pthread_getspecific now returns NULL (POSIX). The old
+  self-linked stand-in poisoned int32 field reads (idx = high half of
+  the block pointer = 0x6000) -> IndexToObject garbage crash. Caller
+  0x102a176a0 lazily mallocs its own 12-byte context when NULL.
+- ZERO PAGE [0,0x10000) RW-noexec mapped: null-relative derefs read 0
+  gracefully; fetch still faults (PC=0 detection intact)
+- ZLIB ENGINE (fn35_zlib.py): full inflate/deflate/uncompress/crc32
+  with z_stream marshaling. Previously _inflateInit2_ etc. were
+  unimplemented stubs returning 0 (silent no-op decompression!)
+- PAK CONTAINER: sys_open/stat/access fall back to serving the real
+  pak from cookeddata; uproject placed at
+  sandbox/.../cookeddata/fortnitegame/fortnitegame.uproject (engine
+  stats it successfully now)
+- SNAPSHOT HYGIENE: trace-arm flags (_kernproc_lm_armed etc.) dropped
+  at save; fd trace + read trace (FN35_TRACE_READ) + mmap trace added
+- **TLB STALENESS DISCOVERY**: every CRC/AES table-loop phantom fault
+  (addresses arithmetically IMPOSSIBLE from the dumped regs, e.g. ldr
+  [x9+w*uxtw#2] faulting at 0x1b15ec4ec with w<=0xFF and valid x9)
+  happened ONLY on snapshot-resumed runs, never fresh boots. FIX:
+  post-restore TB cache flush (deferred to first slice boundary; a
+  direct ctl_remove_cache in load_snapshot DEADLOCKS)
+- wait-guard raised 120s -> 3600s (double constant 0x40ac200000000000,
+  keystone, cave 0x106000080): the async pak mount + name-table build
+  takes MINUTES under emulation
+- ENGINE PAK FLOW MAPPED (FN35_TRACE_READ): fd5 (pak) reads:
+  #1 footer (22463B @33357824 = file end), #2-8 index (7x64KB
+  @32899072..33292288), #9 first entry block (64KB @10878976) - all
+  succeed, then NO more reads. inflate NEVER called (0 stub hits!)
+- The engine's register state during the AES phase held the REAL pak
+  AES key bytes (x3-x7 = a3278ba7 ddd751a7 5456415a 36c35591 ...) -
+  the engine HAS the key; our pakfs uses the same one
+
+Stage Summary:
+- Frontier moved past: 24B-table crash (fixed), CRC/AES phantom faults
+  (fixed via TB flush), null-call exit (still present)
+- REMAINING BLOCKER (precisely mapped): after the entry reads, the
+  engine's project-file read ('../../../FortniteGame/FortniteGame
+  .uproject') fails INSIDE the engine's pak layer - no 10th read, no
+  inflate call. The pak-layer entry serve path dies before touching
+  I/O. Likely: entry lookup against the still-building name table
+  (the 480-bit grind) racing the project check, OR the entry's flags
+  parse refusing the read
+- Next session: instrument the engine's pak entry lookup (find the
+  FindFileInPak equivalent via the pak object's vtable at 0x640000xxx),
+  or serve the uproject through the PHYSICAL layer by making the pak
+  layer's mount point NOT cover '../../../FortniteGame/FortniteGame
+  .uproject' (rename our pak's mount string?)
+- Key numbers: stub[1332]=_read, AES tables @0x104352d48/0x10333887c,
+  grind=480-bit BigInt name-table build, pak idx @33.24-33.36MB
