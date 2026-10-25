@@ -30,8 +30,12 @@ def _setup_env():
     os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
     os.environ.setdefault("GALLIUM_DRIVER", "llvmpipe")
     os.environ.setdefault("MESA_DEBUG", "silent")
-    os.environ.setdefault("__EGL_VENDOR_LIBRARY_FILENAMES",
-                          "/home/z/mesa-debs/glvnd/50_mesa.json")
+    # vendor ICD json: prefer the sandbox's bundled mesa-debs; fall back
+    # silently to the system default (/usr/share/glvnd/egl_vendor.d/)
+    # which is what GitHub-Actions ubuntu runners provide.
+    local_icd = "/home/z/mesa-debs/glvnd/50_mesa.json"
+    if os.path.exists(local_icd):
+        os.environ.setdefault("__EGL_VENDOR_LIBRARY_FILENAMES", local_icd)
 
 
 class GLState:

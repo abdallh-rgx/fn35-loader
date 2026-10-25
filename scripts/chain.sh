@@ -15,7 +15,7 @@ CRASHES_FILE=../fn35/.chain_crashes
 [ -f $CRASHES_FILE ] && CRASHES=$(cat $CRASHES_FILE)
 for i in $(seq 1 $N); do
   LOG=../fn35/ch_$(date +%H%M%S).log
-  timeout 540 python -u fn35_loader.py > $LOG 2>&1
+  timeout 540 python3 -u fn35_loader.py > $LOG 2>&1
   LAST=$(grep -E "stopped:" $LOG | tail -1)
   echo "[chain] seg $i: ${LAST:0:130}"
   if grep -q "FATAL" $LOG; then

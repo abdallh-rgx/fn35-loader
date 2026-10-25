@@ -1,0 +1,147 @@
+name: boot-chain
+on:
+  workflow_dispatch:
+    inputs:
+      fresh:
+        description: 'Fresh boot (discard saved state)'
+        required: false
+        default: false
+        type: boolean
+  workflow_call: {}
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: boot-chain
+  cancel-in-progress: false
+
+jobs:
+  chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      FN35_SNAPSHOT: /home/z/my-project/fn35/snap
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq libegl1 libgles2 unzip >/dev/null
+          python -m pip install --quiet unicorn==2.1.4 capstone keystone-engine pyelftools z3-solver Pillow gdown
+          python -c "import unicorn, capstone, z3, PIL; print('deps ok')"
+
+      - name: Path shim (/home/z/my-project)
+        run: |
+          sudo mkdir -p /home/z
+          sudo ln -sfn "$GITHUB_WORKSPACE" /home/z/my-project
+          ls -la /home/z/my-project | head -5
+
+      - name: Fetch game binary (release asset)
+        run: |
+          set -e
+          mkdir -p /home/z/my-project/fn35/extracted
+          cd /home/z/my-project/fn35
+          gh api "repos/$GITHUB_REPOSITORY/releases" --jq '.[] | select(.tag_name=="game-assets") | .assets[0].url' | head -1 > /tmp/asset_url
+          ASSET=$(cat /tmp/asset_url)
+          if [ -z "$ASSET" ]; then echo "no release asset, trying Drive"; fi
+          if [ -n "$ASSET" ]; then
+            curl -sL -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
+              -o Fortnite35.ipa "$ASSET"
+          else
+            gdown 18U_hneRqVDFyU0M-nHv51jdHHCoiB3tm -O Fortnite35.ipa
+          fi
+          ls -la Fortnite35.ipa
+          unzip -q -o Fortnite35.ipa "Payload/FortniteClient.app/FortniteClient" "Payload/FortniteClient.app/Info.plist" -d extracted_tmp || \
+            unzip -q -o Fortnite35.ipa -d extracted_tmp
+          # place like the local layout: extracted/Payload/...
+          mkdir -p extracted
+          mv extracted_tmp/Payload extracted/Payload 2>/dev/null || true
+          rm -rf extracted_tmp
+          md5sum extracted/Payload/FortniteClient.app/FortniteClient
+          # expect 66130a44341bdebe767d0c8471f1c1cc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore state (previous run artifact)
+        if: ${{ !inputs.fresh }}
+        run: |
+          set -u
+          ID=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=fn35-state&per_page=5" \
+                --jq '[.artifacts[] | select(.expired==false)][0].id // empty' || true)
+          if [ -n "${ID:-}" ]; then
+            echo "restoring state artifact $ID"
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ID/zip" > /tmp/state.zip
+            unzip -q -o /tmp/state.zip -d /tmp/state || true
+            # the zip contains fn35/... paths at root
+            cp -a /tmp/state/fn35/. /home/z/my-project/fn35/ 2>/dev/null || true
+            # delete older state artifacts to save storage
+            for OLD in $(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=fn35-state&per_page=20" --jq '.artifacts[].id'); do
+              [ "$OLD" != "$ID" ] && gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$OLD" || true
+            done
+          else
+            echo "no previous state -> fresh boot"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run boot chain
+        run: |
+          chmod +x /home/z/my-project/scripts/gha_chain.sh
+          export CHAIN_DEADLINE_EPOCH=$(( $(date +%s) + 19500 ))   # ~5h25m of grinding
+          bash /home/z/my-project/scripts/gha_chain.sh | tee /tmp/chain_stop.txt
+          echo "CHAIN_STOP=$(grep STOP_REASON= /tmp/chain_stop.txt | tail -1 | cut -d= -f2)" >> $GITHUB_ENV
+          tail -40 /home/z/my-project/fn35/chain_console.log
+
+      - name: Trim state for upload
+        run: |
+          cd /home/z/my-project
+          # keep the essential chain state; drop bulky caches the loader rebuilds
+          rm -rf fn35/pakcache/* 2>/dev/null || true
+          du -sh fn35/ || true
+          ls fn35/ || true
+
+      - name: Upload state artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fn35-state
+          path: |
+            fn35/snap
+            fn35/snap_good
+            fn35/snap_crash
+            fn35/.chain_crashes
+            fn35/chain_console.log
+            fn35/*.log
+          retention-days: 7
+          if-no-files-found: ignore
+          compression-level: 6
+
+      - name: Upload screenshots (goal!)
+        uses: actions/upload-artifact@v4
+        with:
+          name: fn35-screenshots-${{ github.run_number }}
+          path: download/fn35/screenshots/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Continue chain (self-retrigger)
+        if: ${{ always() && env.CHAIN_STOP != 'first-frame-rendered' && !cancelled() }}
+        run: |
+          # guard: never infinite-loop on setup failures - only retrigger
+          # if the chain actually ran at least one segment this run
+          if ! grep -q "\[gha-chain\]" /home/z/my-project/fn35/chain_console.log 2>/dev/null; then
+            echo "chain never started - NOT retriggering (setup failure)"
+            exit 0
+          fi
+          echo "retriggering boot-chain for the next 6h window..."
+          gh workflow run boot-chain.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
