@@ -333,6 +333,20 @@ class FNLoader:
                 self.arm_lastmile_trace(2_000_000)
             except Exception:
                 pass
+        # portrait milestone: the obfuscated VM grind starts right after
+        # (the engine launch runs as VM bytecode, ~13MB); swap the sync
+        # hook to BLOCK mode for the 6.5x speedup
+        if "bDeviceInPortraitMode" in line and \
+                not getattr(self, "_blk_swap_armed", False):
+            self._blk_swap_armed = True
+            if getattr(self, "_block_cb", None) is not None:
+                self._swap_to_block_pending = True
+                try:
+                    self.uc.emu_stop()      # cut the slice; swap at boundary
+                except Exception:
+                    pass
+                self.console("[sync-hook] portrait milestone: BLOCK swap "
+                             "armed (will apply at slice boundary)")
         if self.live_log:
             try:
                 print(line, flush=True)
@@ -1151,14 +1165,34 @@ class FNLoader:
                 # hooks and zone hooks do NOT; bench: ~0.46M instr/s,
                 # ~10x slower than no-hook but the only correct mode)
                 uc.reg_read(a64.UC_ARM64_REG_SP)
+
+            def _block_sync(uc, addr, size, user):
+                uc.reg_read(a64.UC_ARM64_REG_SP)
+
+            self._sync_cb = _global_sync
+            self._block_cb = _block_sync
+            self._swap_to_block_pending = False
             try:
                 if _sh_mode == "block":
                     from unicorn import UC_HOOK_BLOCK
-                    self.uc.hook_add(UC_HOOK_BLOCK, _global_sync)
+                    self._sync_hook_h = self.uc.hook_add(
+                        UC_HOOK_BLOCK, _block_sync)
                     self.console("[sync-hook] BLOCK 1-read hook armed "
                                  "(TCG desync fix, block mode)")
+                elif _sh_mode == "auto":
+                    # code mode through the early init table loops (block
+                    # mode desync-crashed init ~253), auto-swap to block
+                    # at the portrait milestone for the 6.5x VM-grind
+                    # speedup. See the console filter for the swap arm.
+                    from unicorn import UC_HOOK_CODE, UC_HOOK_BLOCK
+                    self._sync_hook_h = self.uc.hook_add(
+                        UC_HOOK_CODE, _global_sync)
+                    self._block_hook_kind = UC_HOOK_BLOCK
+                    self.console("[sync-hook] auto mode: CODE hook now; "
+                                 "swap to BLOCK at portrait milestone")
                 else:
-                    self.uc.hook_add(UC_HOOK_CODE, _global_sync)
+                    self._sync_hook_h = self.uc.hook_add(
+                        UC_HOOK_CODE, _global_sync)
                     self.console("[sync-hook] global 1-read code hook armed "
                                  "(TCG desync fix)")
             except Exception as e:
@@ -2618,6 +2652,23 @@ class FNLoader:
                                      "(ctl_flush_tb fast path)")
                 except Exception as e:
                     self.console("[lm-trace] flush failed: %r" % (e,))
+            # sync-hook auto swap (armed at the portrait milestone):
+            # between slices only -- hook_del/hook_add mid-emulation is
+            # unsafe. Block mode is 6.5x faster for the VM grind.
+            if getattr(self, "_swap_to_block_pending", False) and \
+                    getattr(self, "_block_cb", None) is not None:
+                self._swap_to_block_pending = False
+                try:
+                    if getattr(self, "_sync_hook_h", None) is not None:
+                        self.uc.hook_del(self._sync_hook_h)
+                        self._sync_hook_h = None
+                    from unicorn import UC_HOOK_BLOCK
+                    self._sync_hook_h = self.uc.hook_add(
+                        UC_HOOK_BLOCK, self._block_cb)
+                    self.console("[sync-hook] SWAPPED to BLOCK hook "
+                                 "(VM grind speed)")
+                except Exception as e:
+                    self.console("[sync-hook] swap failed: %r" % (e,))
             if not t.pc:
                 # NULL function-pointer call (blr xzr / stored NULL):
                 # unicorn no-ops an emu_start(0, 0) slice, so without

@@ -412,6 +412,20 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
     l._lm_flush_pending = True
     l.console("[snap] TB flush deferred to first slice boundary "
               "(TLB staleness fix)")
+    # sync-hook mode restore: if the snapshot was saved mid-VM-grind the
+    # BLOCK swap already fired -- re-arm BLOCK directly (the fresh
+    # loader instance above re-armed CODE in auto mode)
+    try:
+        if getattr(l, "_blk_swap_armed", False) and \
+                getattr(l, "_block_cb", None) is not None and \
+                getattr(l, "_sync_hook_h", None) is not None:
+            l.uc.hook_del(l._sync_hook_h)
+            l._sync_hook_h = None
+            from unicorn import UC_HOOK_BLOCK
+            l._sync_hook_h = l.uc.hook_add(UC_HOOK_BLOCK, l._block_cb)
+            l.console("[snap] BLOCK sync hook re-armed (mid-VM snapshot)")
+    except Exception as e:
+        l.console("[snap] block re-arm failed: %r" % (e,))
     return l
 
 
