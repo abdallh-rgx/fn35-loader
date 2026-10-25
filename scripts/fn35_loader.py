@@ -2910,8 +2910,26 @@ class FNLoader:
         except Exception as e:
             self.console("[png-rd] %s fd=%d log-failed %r" % (tag, fd, e))
 
+    def engine_pak_blocked(self, gpath):
+        """FN35_NO_ENGINE_PAK: make every .pak file INVISIBLE to the guest
+        (ENOENT) so the engine's own FPakPlatformFile never mounts (its
+        name-table lookup is desync-fragile). Our pakfs still serves
+        individual files physically from the Python side."""
+        import os as _os
+        if not _os.environ.get("FN35_NO_ENGINE_PAK"):
+            return False
+        if not gpath or not gpath.lower().endswith(".pak"):
+            return False
+        if not getattr(self, "_epb_logged", False):
+            self._epb_logged = True
+            self.console("[pak-open] guest .pak access blocked -> ENOENT "
+                         "(FN35_NO_ENGINE_PAK physical model)")
+        return True
+
     def sys_open(self, gpath, flags, mode):
         import os as _os
+        if self.engine_pak_blocked(gpath):
+            return -2
         _dbg_proj = gpath and ".uproject" in gpath.lower()
         host = self.translate_path(gpath)
         if host is None:
@@ -3122,6 +3140,8 @@ class FNLoader:
 
     def sys_stat(self, gpath, st_addr):
         import os as _os
+        if self.engine_pak_blocked(gpath):
+            return -2
         host = self.translate_path(gpath)
         if not host:
             return -2
@@ -3465,6 +3485,8 @@ def _rename_fn(l, a, b):
 def _access_fn(l, path, mode):
     pth = l.gcstr(path)
     import os as _os
+    if l.engine_pak_blocked(pth):
+        return -2
     if ".uproject" in pth.lower():
         l.console("[acc-proj] %r mode=%d" % (pth, mode))
     host = l.translate_path(pth)
