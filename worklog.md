@@ -422,3 +422,31 @@ Stage Summary:
   -> C ABI -> safe Rust, all green, committed bcb44e8
 - Next: keep one_seg rhythm + extend rust conversion (next module:
   the scheduler / stub farm core), watch Actions milestones
+
+---
+Task ID: session-6 (continued 21:20Z)
+Agent: main (Z.ai)
+
+Work Log:
+- DESYNC WAR WON (for now): three-layer defense
+  1. fetch-desync branch repair: null-call walker decodes bl->stub->
+     adrp/ldr GOT slot; REGISTER DESYNC verdict (x16=0, slot nonzero)
+     -> deferred PC redirect to the slot value between slices
+     (test_fetchfix2.py proves the emu_stop+rewrite+restart pattern)
+  2. DSR v2 default-on (and-mask/add pair-fold, deferred writes)
+  3. poison-read catch: wild READ_UNMAPPED(19!)/READ_PROT(23) outside
+     all windows -> zero page (one-word corruption, no budget loss)
+  - unicorn 2.1.4 ACCESS CODES CORRECTED: READ_UNMAPPED=19 (NOT 16)
+- RESULT: fresh boot 245-crash-wall -> init 773/773 + didFinishLaunching
+  -> VM grind now runs FULL budget segments with ZERO crashes
+- one_seg.sh: crash counter resets on crash-PC change (progress-aware),
+  rollback threshold 5; BLOCK sync once didFinishLaunching seen
+- Actions: run 40225859751 (old code) cancelled; 40234559807 running
+  with all fixes since 21:14Z (fresh boot, ~5h25m, self-retriggering)
+- Pillow installed in venv (screenshot PNG path ready)
+
+Stage Summary:
+- Local: init table DONE, didFinishLaunching DONE, in the obfuscated
+  VM launch grind (probe_vmpos said ~13MB bytecode, idx advancing)
+- Runner: fresh universe with the fixed engine
+- Next: keep one_seg rhythm + rust conversion (fn35-macho next)
