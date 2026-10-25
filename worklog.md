@@ -367,3 +367,58 @@ Stage Summary:
   watch ch_*.log for LogInit/LogPakFile/LogRHI milestones
 - Metal deliverables (session 5a): Z3 spec + safe Rust + ffi + bridge
   all green and pushed
+
+---
+Task ID: session-6 (2026-10-25/26, 15h marathon)
+Agent: main (Z.ai)
+Task: Marathon to the login screen: GitHub Actions offload + safe-Rust
+conversion + Z3/Metal continuation (user directive: work until tomorrow
+13:00 Baghdad time; use Actions runners; start comprehensive rust-safe
+conversion; continue Z3 + Metal)
+
+Work Log:
+- env restore #3: binary from /tmp (md5 ok), deps reinstalled in the
+  ACTIVE VENV (python3.12 via python3 -m pip --break-system-packages
+  was installing to 3.13's user site!), mesa EGL debs re-extracted to
+  /home/z/mesa-debs (apt-get download + dpkg -x, no sudo needed)
+- fn35_gles.py: EGL vendor ICD now conditional (local mesa-debs if
+  present, else system default) -> Actions runners work out of the box
+- CRITICAL sandbox discovery: background processes (nohup/setsid/
+  disown) are REAPED between tool calls -> local chains die silently
+  (0-byte logs). Workaround: one_seg.sh runs a single ~9.5-min segment
+  per tool call with full crash-recovery logic
+- GitHub Actions offload LIVE:
+  * release 'game-assets' created; Fortnite35.ipa uploaded as asset
+    (82MB; primary source, Drive gdown as fallback)
+  * .github/workflows/boot-chain.yml: self-chaining 6h runner loop
+    (ubuntu-latest 4cpu/16GB, ~5h25m grind per window, state artifact
+    fn35-state resumed between runs, old artifacts deleted, screenshot
+    artifact = mission accomplished, retrigger guard against setup
+    failures, concurrency group boot-chain)
+  * first run 40225859751 grinding since 19:24Z
+- SAFE RUST CONVERSION (the big one):
+  * rust/ workspace: fn35-metal (pure core, #![forbid(unsafe_code)],
+    zero deps) + fn35-metal-ffi (cdylib, the ONLY unsafe in the stack:
+    pointer slicing at the C boundary)
+  * full-stack differential conformance GREEN: 300 Z3 traces / 2501
+    steps / 0 mismatches (python ctypes -> C ABI -> safe Rust == Z3
+    oracle); the Rust-side test additionally asserts kind+phase+buf_len
+    (stronger than the Python harness)
+  * 4 real bugs found by the differential (the .so never existed before,
+    so session-5's "full-stack" claim was aspirational):
+    1. tex_new: no level/dim caps in spec (lvl=128 legal) but sign-bit
+       u32 guards needed (negative i32s arrive via u32 FFI)
+    2. buf_new: i64 sign-bit rejection (ln=-1 -> 0xFFFF... u64)
+    3. PF_BGRA8 = 80 (MTL format id) not 1 -> E_PARSE cascade
+    4. spec-exact uncapped lengths via bounded shadow storage (logical
+       buf_len kept even beyond the 1GiB shadow; lazy mip planes)
+- local chain rhythm: one_seg.sh per tool call (seg1: fresh boot ->
+  init 245/777 + crash-recovery worked)
+
+Stage Summary:
+- Two parallel universes grinding: Actions runner (16GB, ~5h25m
+  windows, self-retriggering) + local 10-min segments
+- Metal stack now REALLY full-conformance: Z3 spec -> traces -> ctypes
+  -> C ABI -> safe Rust, all green, committed bcb44e8
+- Next: keep one_seg rhythm + extend rust conversion (next module:
+  the scheduler / stub farm core), watch Actions milestones
