@@ -14,6 +14,7 @@
 Registers into fn35_clib.IMPL (import AFTER fn35_ioslib so it wins).
 """
 import ctypes
+import os
 import struct
 import sys
 import time
@@ -471,10 +472,22 @@ class ObjCRuntime:
         """Called from scheduler: fire display links + timers."""
         l = self.l
         now = l.vclock
+        if os.environ.get("FN35_TRACE_TICK"):
+            self._tick_n = getattr(self, "_tick_n", 0) + 1
+            if self._tick_n <= 3 or self._tick_n % 100 == 0:
+                l.console("[tick] #%d now=%.1f timers=%d dls=%d "
+                          "(nexts: %s)"
+                          % (self._tick_n, now / 1e9, len(self.timers),
+                             len(self.display_links),
+                             ["%.1f" % (t.get("next", 0) / 1e9)
+                              for t in self.timers]))
         for t in self.timers:
             if t.get("done"):
                 continue
             if now >= t["next"]:
+                if os.environ.get("FN35_TRACE_TICK"):
+                    l.console("[tick] FIRING %s (target=0x%x)"
+                              % (t.get("sel"), t.get("target", 0)))
                 t["next"] = now + int(t["interval"] * 1e9)
                 if not t.get("repeats"):
                     t["done"] = True
@@ -1742,7 +1755,13 @@ def _fire_native(l, target, sel, arg, note_name=None):
     r = rt.resolve(target, sel)
     if not (r and r[0] == "imp"):
         l.trace_objc("fire %s on 0x%x (no imp)" % (sel, target))
+        if os.environ.get("FN35_TRACE_TICK"):
+            l.console("[fire] %s on 0x%x NO-IMP (r=%r)" % (sel, target,
+                      (r[0], hex(r[1]) if r and r[0] == "imp" else None)
+                      if r else None))
         return
+    if os.environ.get("FN35_TRACE_TICK"):
+        l.console("[fire] %s on 0x%x -> imp 0x%x" % (sel, target, r[1]))
     t = l.new_thread(r[1], 0, name="of.%s" % sel[:24], stack_size=4 << 20)
     selreg = rt.sel_for(sel)
     from fn35_loader import XREGS

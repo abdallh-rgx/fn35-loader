@@ -7,6 +7,7 @@ qsort. Registers implementations into fn35_clib.IMPL.
 """
 import os
 import struct
+import time
 
 from fn35_clib import cfunc, IMPL, _to_int
 
@@ -430,6 +431,39 @@ def _pthread_cond_timedwait(l, cond, m, abstime):
             wake = (sec & 0x7FFFFFFFFFFFFFFF) * 1000000000 + nsec
         except Exception:
             wake = None
+    if os.environ.get("FN35_TRACE_WAIT"):
+        try:
+            if not hasattr(l, "_wt_seen"):
+                l._wt_seen = {}
+                l._wt_t0 = time.time()
+                l._wt_err = 0
+            now = l.vclock
+            if wake is None:
+                try:
+                    raw = l.rd64(abstime) if abstime else None
+                except Exception:
+                    raw = "RDFAIL"
+                key = (cond, m, "WAKE_NONE", repr(raw)[:12])
+            else:
+                delta_ms = (wake - now) / 1e6
+                if delta_ms >= 0:
+                    key = (cond, m, "%dms" % round(delta_ms))
+                else:
+                    key = (cond, m, "PAST%dms" % round(-delta_ms))
+            l._wt_seen[key] = l._wt_seen.get(key, 0) + 1
+            if sum(l._wt_seen.values()) >= 5000:
+                top = sorted(l._wt_seen.items(),
+                             key=lambda kv: -kv[1])[:6]
+                for k_, n in top:
+                    l.console("[wait-trace] key=%r n=%d" % (k_, n))
+                l.console("[wait-trace] vclock now=%.1fs (%.1fs real "
+                          "elapsed)" % (now / 1e9,
+                                        time.time() - l._wt_t0))
+                l._wt_seen = {}
+        except Exception as e:
+            l._wt_err = getattr(l, "_wt_err", 0) + 1
+            if l._wt_err <= 3:
+                l.console("[wait-trace] INTERNAL ERR %r" % (e,))
     l.block_cur("cond", cond, extra=m, wake_ns=wake, ret=0)
     return 0
 

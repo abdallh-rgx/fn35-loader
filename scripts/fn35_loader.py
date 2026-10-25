@@ -3924,9 +3924,13 @@ def _fdopen_fn(l, fd, mode):
 @cfunc("_gettimeofday")
 def _gettimeofday_fn(l, tv, tz):
     if tv:
-        s = int(time.time())
-        l.w64(tv, s)
-        l.w64(tv + 8, 0)
+        t = time.time()
+        l.w64(tv, int(t))
+        # REAL microsecond resolution (tv_usec != 0!). The old
+        # second-granularity stub made every sub-second FEvent::Wait
+        # measure ZERO elapsed time and spin forever on its last ~10us
+        # (the multi-day boot crawl root cause).
+        l.w64(tv + 8, int((t % 1.0) * 1e6))
     return 0
 
 
@@ -3941,9 +3945,9 @@ def _time_fn(l, out):
 @cfunc("_clock_gettime")
 def _clock_gettime_fn(l, clk, ts):
     if ts:
-        s = int(time.time())
-        l.w64(ts, s)
-        l.w64(ts + 8, 0)
+        t = time.time()
+        l.w64(ts, int(t))
+        l.w64(ts + 8, int((t % 1.0) * 1e9))
     return 0
 
 
