@@ -256,3 +256,67 @@ Stage Summary:
 - Frontier known-good config: FN35_SYNC_HOOK=auto, NO NO_ENGINE_PAK,
   uproject hidden, chain.sh for crash recovery
 - Everything pushed to abdallh-rgx/fn35-loader (~30 commits today)
+
+---
+Task ID: session-5 (2026-10-25/26)
+Agent: main (Z.ai)
+Task: env restore after 2nd sandbox wipe + user-directed Metal
+architecture: Z3 formal spec -> safe Rust -> Python bridge; keep the
+grind alive toward the login screen
+
+Work Log:
+- ENV RESTORE (3rd wipe survived in /tmp/my-project): binary md5
+  66130a44341bdebe767d0c8471f1c1cc ✓, snap (init=773 phase=main,
+  16 threads, 140MB) ✓, pakcache/aes-archive ✓; python deps reinstalled
+  (unicorn 2.1.4 via uv venv, capstone, keystone-ENGINE not openstack
+  keystone!, pyelftools); Mesa rebuilt from trixie debs at
+  /home/z/mesa-debs (libegl1+libegl-mesa0+libgles2, glvnd JSON at
+  glvnd/50_mesa.json, surfaceless llvmpipe EGL 1.5 verified)
+- CHAIN: sandbox reaper kills background processes at tool-call end
+  (proven with marker test) -> segments now run FOREGROUND, 1 per call;
+  chain.sh retargeted to fn35/snap + FN35_SYNC_HOOK=block direct
+  (mid-grind, past init table loops) + budget 500s
+- FIX: block sync mode crashed install_hooks (UC_HOOK_CODE unbound
+  outside the auto branch) — imports added
+- Z3 FORMAL SPEC (scripts/metal_z3_spec.py): full transition system
+  (Phase lattice CREATED<ACTIVE<COMMITTED<SCHEDULED<{COMPLETED,ERRORED}),
+  guards+effects for 14 ops, ModelState concrete oracle; PROOFS:
+  P0 inductive invariance (21 unsat checks), P1 no-encode-after-commit,
+  P2 phase monotonicity, P3 bounds safety, P4 dead-handle rejection,
+  P5 bounded liveness (commit -> <=2 ticks -> completed); 20K randomized
+  traces + progression-directed generator (non-vacuous: constructors
+  OP_DEV_NEW/OP_QUEUE_NEW added after I caught the vacuity — original
+  traces could never create objects!)
+- SAFE RUST (rust/ workspace): fn35-metal crate = 100% safe
+  (#![forbid(unsafe_code)]): error/cmd/resource/air/shim modules —
+  CommandBuffer state machine, Buffer/Texture checked arithmetic
+  (usize/u32 overflow-safe, 256MB caps as documented refinement),
+  dependency-free .metallib/AIR parser (MTLB+METD JSON+plist, UE
+  wrapper tolerance, 5K-case fuzz no-panic); fn35-metal-ffi crate = the
+  ONLY unsafe (raw ptr boundaries, 1-3 lines each) exposing fn35_metal_*
+  C ABI + last_error for constructor rejection codes
+- DIFFERENTIAL CONFORMANCE: Z3-generated traces replayed against Rust
+  (tests/conformance.rs): 300 traces / 2501 steps, rc+kind+phase+
+  buflen bit-identical; THEN the SAME traces through the Python ctypes
+  bridge (fn35_metal.py --selftest): full stack (python -> C ABI ->
+  safe Rust == Z3) 0 mismatches
+- OBJC BRIDGE: fn35_metal.py ghost classes (MTLDevice/Queue/CommandBuffer/
+  Buffer/Texture/Library/Function/TextureDescriptor) routing selectors
+  into the Rust registry; MTLCreateSystemDefaultDevice wired in ioslib
+  (opt-in FN35_METAL=1 — default stays nil-device so the GL chain is
+  never destabilized); GHOST_SIZES/SUPER registered
+- GRIND STATUS: segments complete cleanly (budget ends, good snapshots,
+  0 crash recoveries needed); hot-PC profiling + capstone decoded the
+  active loops = ICU date/calendar math (µs normalization -0xF4240,
+  sdiv/madd calendar splits), NOT the old VM interpreter; approx_instr
+  is an inflated upper bound (adds full 5M slice_size per slice) but
+  relative progress is steady ~+37% of accumulated per segment
+
+Stage Summary:
+- User's Metal architecture delivered: mathematical description (Z3,
+  machine-checked proofs) -> safe Rust implementation (forbid unsafe)
+  -> C ABI -> Python ctypes -> ObjC ghosts; every layer differentially
+  verified against the same Z3 oracle
+- All pushed to abdallh-rgx/fn35-loader (line-by-line autosave honored)
+- Grind continues toward LogInit/GL/login-screen milestones; watch for
+  new console strings in ch_*.log segments

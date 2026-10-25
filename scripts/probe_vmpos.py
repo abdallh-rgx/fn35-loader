@@ -13,7 +13,7 @@ from unicorn.arm64_const import UC_ARM64_REG_SP, UC_ARM64_REG_PC
 
 BASE = "/home/z/my-project"
 MACHO = BASE + "/fn35/extracted/Payload/FortniteClient.app/FortniteClient"
-SNAP = BASE + "/fn35/snap2"
+SNAP = os.environ.get("FN35_SNAPSHOT", BASE + "/fn35/snap")
 LOOP_LO, LOOP_HI = 0x101838ab0, 0x101839660
 
 l = fn35_snap.load_snapshot(SNAP, MACHO, BASE + "/fn35/sandbox",

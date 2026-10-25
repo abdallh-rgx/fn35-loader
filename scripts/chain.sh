@@ -7,7 +7,7 @@ export LD_LIBRARY_PATH=/home/z/mesa-debs/root/usr/lib/x86_64-linux-gnu
 # snap is mid-VM-grind (past portrait + init table loops) -> BLOCK sync
 # hook directly (6.5x grind speedup; CODE only needed for init 0-253)
 export FN35_SYNC_HOOK=${FN35_SYNC_HOOK:-block}
-export FN35_BUDGET=${FN35_BUDGET:-430}
+export FN35_BUDGET=${FN35_BUDGET:-500}
 export FN35_SNAPSHOT=${FN35_SNAPSHOT:-/home/z/my-project/fn35/snap}
 N=${1:-5}
 CRASHES=${CRASHES:-0}
