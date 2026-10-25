@@ -320,3 +320,50 @@ Stage Summary:
 - All pushed to abdallh-rgx/fn35-loader (line-by-line autosave honored)
 - Grind continues toward LogInit/GL/login-screen milestones; watch for
   new console strings in ch_*.log segments
+
+---
+Task ID: session-5b (2026-10-26, continued)
+Agent: main (Z.ai)
+Task: THE BOOT-CRAWL ROOT CAUSE HUNT — full chain from symptom to fix
+
+Work Log:
+- Forensics chain (each step pinned by live evidence):
+  1. wait-trace (FN35_TRACE_WAIT in _pthread_cond_timedwait): all
+     FEvent waits carried ~100-150ms PAST deadlines at call time
+  2. hot-PC profile (probe_hotpc.py): 0x102c52618-6a0 + the µs/date
+     normalization helper 0x10178e60c (0xFFF0BDC0 = -1e6 µs)
+  3. capstone decode: hotloop = FEvent::Wait(timeout) — w21=remaining,
+     w8=elapsed from paired gettimeofday calls, exit on w21<=w8 or
+     cancel flag [x19+0x14]; call1/call2 resolve to loader stub farm
+     (svc #0x50e=gettimeofday, svc #0x42f=cond_timedwait)
+  4. dump_threads.py: main parked ('forever','uikit_runloop'), 4
+     forever-cond waiters, 10-11 pollers with stale wake times
+  5. LIVE SUBS TRACE at 0x102c5266c: **w21=10 w8=0 w21'=10** — the
+     elapsed measured ZERO every iteration = THE infinite spin
+- ROOT CAUSE: _gettimeofday stub wrote tv_usec=0 (second granularity).
+  Every sub-second FEvent::Wait measured zero elapsed on its final
+  ~10µs and spun at max stub rate forever. All previous sessions'
+  multi-day crawls ("takes MINUTES under emulation", segBX/BZ silent
+  phases, the whole 480-bit name-table grind) had this as the common
+  accelerant; threads only ever escaped when a real-second boundary
+  coincided with a blocked interval (explains the intermittent
+  progress + random desync crashes inside stub-storm slices).
+- FIX: real µs in gettimeofday (tv+8), real ns in clock_gettime.
+  mach_absolute_time was already ns (vclock). Committed 507c332.
+- VERIFICATION: subs trace after fix: w8=445446 (real measured!),
+  75704/78300 exit-patterns; mach_absolute_time calls 2.7K -> 94.8K
+  per stub window; mutex/getspecific 1.3K -> 47.4K (engine tick
+  pattern live). Thread dump after segments: the 10 former spinners
+  now block with FUTURE spread deadlines (healthy wait-based mode).
+  [x19+0x18] identified as recursion counter (inc at entry, dec at
+  every exit), not iteration count.
+- The grind now progresses at ~1:1 wall clock (vclock wall-paced,
+  clock_cap +5ms). Engine pre-LogInit; segments keep advancing.
+
+Stage Summary:
+- THE most impactful fix of the project so far: multi-day crawl
+  root-caused to one line (tv_usec=0), fixed, verified live
+- All state: chain segments (500s budget) + good-snapshot rollback;
+  watch ch_*.log for LogInit/LogPakFile/LogRHI milestones
+- Metal deliverables (session 5a): Z3 spec + safe Rust + ffi + bridge
+  all green and pushed
