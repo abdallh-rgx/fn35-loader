@@ -178,6 +178,17 @@ class FNLoader:
 
         self.uc = Uc(UC_ARCH_ARM64, UC_MODE_ARM)
 
+        # ---- NULL-tolerance zero page -------------------------------
+        # [0, 0x10000) RW (NOT exec): data reads of NULL+offset return
+        # 0 instead of faulting, so code that derefs a missing TLS/pool
+        # pointer degenerates gracefully (fields read as zero) instead
+        # of dying. Instruction fetch at low addresses still faults
+        # (UC_MEM_FETCH_PROT -> on_fetch) so PC=0 stays detectable.
+        try:
+            self.uc.mem_map(0, 0x10000, 3)  # READ|WRITE, no EXEC
+        except UcError:
+            pass
+
         # pak overlay (lazily armed in prepare(); None until then)
         self.pakfs = None
         self.dir_handles = {}
@@ -333,7 +344,8 @@ class FNLoader:
         if last is None:
             self._last_console_wall = now
             return
-        if now - last < 30.0:
+        hb = float(os.environ.get("FN35_HB_SECS", "30"))
+        if now - last < hb:
             return
         self._last_console_wall = now   # fire at most once per 30s
         t = self.cur
@@ -353,6 +365,16 @@ class FNLoader:
         tops = "; ".join("%s(0x%x) %dM %s@%s" % (
             th.name[:22], th.tid, th.approx_instr // 1000000,
             th.state, th.wait) for _, th in top[:3])
+        # where is each top thread parked/spinning? (saved regs at last
+        # switch — for the RUNNING thread it's the switch-out point, good
+        # enough to identify a spin loop)
+        for _, th in top[:3]:
+            if th.pc:
+                nm2, sa2 = self.nearest_symbol(th.pc)
+                tops += " [%s pc=0x%x %s+0x%x]" % (th.name[:14],
+                                                   th.pc,
+                                                   (nm2 or "?")[:30],
+                                                   th.pc - (sa2 or 0))
         if t is not None:
             pc = t.pc
             nm, sa = self.nearest_symbol(pc)
@@ -2395,7 +2417,14 @@ class FNLoader:
             p = self.translate_path(self.gcstr(x[0]))
             import os as _os
             mode = x[1]
+            gpath = self.gcstr(x[0])
             ok = _os.access(p, _os.R_OK) if p else False
+            if not ok and self.pakfs is not None:
+                if self.pakfs.resolve(gpath) is not None \
+                        or self.pakfs.resolve_dir(gpath) is not None:
+                    ok = True
+                elif self._pak_container_fallback(gpath, p):
+                    ok = True
             return 0 if ok else -2
         if n == 54:                                   # ioctl
             return 0
@@ -2582,14 +2611,27 @@ class FNLoader:
 
     def sys_open(self, gpath, flags, mode):
         import os as _os
+        _dbg_proj = gpath and ".uproject" in gpath.lower()
         host = self.translate_path(gpath)
         if host is None:
+            if _dbg_proj:
+                self.console("[open-proj] %r -> translate_path None"
+                             % gpath)
             return -2
+        _mk = None
         if self.pakfs is not None and not _os.path.exists(host):
             # pak overlay: files materialize into the cache, dirs as dirs
-            mk = self.pakfs.materialize(gpath)
-            if mk is not None:
-                host = mk
+            _mk = self.pakfs.materialize(gpath)
+            if _mk is not None:
+                host = _mk
+        if _mk is None and not _os.path.exists(host):
+            _pk = self._pak_container_fallback(gpath, host)
+            if _pk:
+                host = _pk
+                _mk = _pk
+        if _dbg_proj:
+            self.console("[open-proj] %r -> host=%s exists=%s mk=%r flags=0x%x"
+                         % (gpath, host, _os.path.exists(host), _mk, flags))
         # PNG forensics: log every served PNG + verify its header CRC
         if gpath and gpath.lower().endswith(".png"):
             try:
@@ -2723,6 +2765,25 @@ class FNLoader:
             self.wrb(st_addr, bytes(buf))
         return 0
 
+    def _pak_container_fallback(self, gpath, host):
+        """When a guest .pak path can't be resolved to a host file, serve
+        the real pak container from the app's cookeddata tree. Returns
+        the host path or None."""
+        if not gpath or not gpath.lower().endswith(".pak"):
+            return None
+        import os as _os
+        _base = _os.path.basename(gpath.replace("\\", "/")).lower()
+        _cand = _os.path.join(
+            _os.path.dirname(self.macho_path), "cookeddata",
+            "fortnitegame", "content", "paks", _base)
+        if _os.path.isfile(_cand):
+            if not getattr(self, "_pak_served", False):
+                self._pak_served = True
+                self.console("[pak-open] serving pak container %r -> %s"
+                             % (gpath, _cand))
+            return _cand
+        return None
+
     def sys_stat(self, gpath, st_addr):
         import os as _os
         host = self.translate_path(gpath)
@@ -2734,6 +2795,10 @@ class FNLoader:
                 host = mk
                 if _os.environ.get("FN35_LOG_OPEN"):
                     self.console("[stat-pak] %r -> %r" % (gpath, host))
+            else:
+                pk = self._pak_container_fallback(gpath, host)
+                if pk:
+                    host = pk
         return self._pack_stat(st_addr, host)
 
     def sys_fstat(self, fd, st_addr):
@@ -3056,6 +3121,8 @@ def _rename_fn(l, a, b):
 def _access_fn(l, path, mode):
     pth = l.gcstr(path)
     import os as _os
+    if ".uproject" in pth.lower():
+        l.console("[acc-proj] %r mode=%d" % (pth, mode))
     host = l.translate_path(pth)
     if host and _os.path.exists(host):
         return 0
@@ -3063,12 +3130,16 @@ def _access_fn(l, path, mode):
         return 0
     if l.pakfs is not None and l.pakfs.resolve_dir(pth) is not None:
         return 0
+    if l._pak_container_fallback(pth, host):
+        return 0
     return -2
 
 
 @cfunc("_stat", "_stat64", "_lstat", "_lstat64", "_stat64_extended")
 def _stat_fn(l, path, out):
     p = l.gcstr(path)
+    if ".uproject" in p.lower():
+        l.console("[stat-proj] %r" % p)
     if "nternationali" in p or "icudt" in p:
         l.console("[icu-stat] %r" % p)
     return l.sys_stat(p, out)

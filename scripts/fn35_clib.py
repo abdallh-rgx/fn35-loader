@@ -725,6 +725,8 @@ def _printf(l, fmt):
     else:
         txt = raw.split(b"\x00")[0].decode("utf-8", "replace")
     txt2 = fmt_engine(txt, RegSrc(l, 1)) if "%" in txt else txt
+    if not txt2.strip() and "%s" not in txt and "Failed" in txt:
+        l.console("[PROJ-EARLY] txt=%r txt2=%r x1=%x" % (txt[:60], txt2[:60], l.reg_x(1)))
     if not txt2.strip() and "%s" in txt:
         # the engine sometimes passes the first vararg on the stack
         # (stack vararg slot = [sp]); retry with that
@@ -797,6 +799,27 @@ def _printf(l, fmt):
             l.console("[crc-stack] %s" % " <- ".join(chain[:14]))
         except Exception as e:
             l.console("[crc-stack] walk failed %r" % (e,))
+    if "Failed to read file" in (txt2 or "") and \
+            not getattr(l, "_uproj_dumped", False):
+        l._uproj_dumped = True
+        try:
+            l.console("[PROJ-FAIL] stack scan:")
+            sp = l.reg_sp()
+            for off in range(0, 0x300, 8):
+                v = l.rd64(sp + off)
+                if 0x100000000 <= v < 0x106000000:
+                    nm2, sa2 = l.nearest_symbol(v)
+                    l.console("  [pf +0x%03x] 0x%x %s+0x%x"
+                               % (off, v, (nm2 or "?")[:52], v - (sa2 or 0)))
+            l.console("[PROJ-FAIL] recent file stubs:")
+            for e in list(l.stub_ring)[-400:]:
+                s = str(e[0])
+                if any(f in s for f in ("open", "stat", "access", "read",
+                                        "getcwd", "realpath", "dirent",
+                                        "NSGet", "proc")):
+                    l.console("   %s" % (e,))
+        except Exception as _e:
+            l.console("[PROJ-FAIL] dump err %r" % _e)
     l.console("printf: " + (txt2 or txt))
     return len(txt2 or txt)
 

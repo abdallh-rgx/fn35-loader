@@ -475,29 +475,14 @@ def _pthread_getspecific(l, key):
     v = l.cur.specific.get(key, 0)
     if v:
         return v
-    z = l.cur.tlv_bases.get(("specz", key))
-    if z is None:
-        z = l.heap_alloc(0x4000, zero=True)
-        # self-linked block: every qword points to the block itself.
-        # Library code reads internal fields (e.g. [tls+0x98],
-        # [tls+0xb4]) and passes them on without null checks; a zero
-        # block turns those into NULL derefs one level deeper (seen:
-        # [0+0xb4] crash). Self-pointers keep the chain alive so the
-        # code walks a degenerate-but-valid structure instead.
-        import struct as _st
-        try:
-            l.wrb(z, _st.pack("<2048Q", *([z] * 2048)))
-        except Exception:
-            pass
-        l.cur.tlv_bases[("specz", key)] = z
-        if not getattr(l, "_specz_logged", False):
-            l._specz_logged = True
-            try:
-                l.console("[tls] self-linked stand-in for key=%d tid=0x%x "
-                          "-> 0x%x" % (key, l.cur.tid, z))
-            except Exception:
-                pass
-    return z
+    # POSIX semantics: unset key -> NULL. The CALLER is expected to
+    # lazily create its context (malloc + setspecific) — the engine's
+    # 0x102a176a0 wrapper does exactly that. A non-NULL stand-in here
+    # poisons int32 field reads (idx = high half of the pointer!)
+    # which crashed IndexToObject with garbage indices (segBU+).
+    # Null-relative derefs one level deeper are absorbed by the
+    # zero page mapped at [0, 0x10000).
+    return 0
 
 
 @cfunc("_pthread_setspecific")

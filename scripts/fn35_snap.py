@@ -251,6 +251,13 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
             l.uc.mem_unmap(_r[0], _r[1] - _r[0] + 1)
         except Exception:
             pass
+    # NULL-tolerance zero page (see fn35_loader.__init__): saved regions
+    # never include [0,0x10000) — re-map it here so resumed runs behave
+    # identically to fresh boots (RW, no exec).
+    try:
+        l.uc.mem_map(0, 0x10000, 3)
+    except Exception:
+        pass
     _saved = sorted(((r["begin"], r["end"], r["perms"])
                      for r in meta["regions"]), key=lambda x: x[0])
     _merged = []
