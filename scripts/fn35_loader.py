@@ -2397,9 +2397,17 @@ class FNLoader:
             # deferred TB flush (armed mid-emulation): safe between slices
             if getattr(self, "_lm_flush_pending", False):
                 self._lm_flush_pending = False
+                # PERF FIX (segAL crawl): the old range sweep
+                # ctl_remove_cache(1, 0xFFFFFFF00000) walks a ~17TB
+                # range and takes 5-8 MINUTES per call (measured with
+                # py-spy: the whole resumed segment was stuck inside
+                # it, doing only 10 dyld inits in 420s). ctl_flush_tb()
+                # is the dedicated O(1) full-flush API (UC_CTL_TB_FLUSH)
+                # and achieves the same post-restore staleness fix.
                 try:
-                    self.uc.ctl_remove_cache(1, 0xFFFFFFF00000)
-                    self.console("[lm-trace] TB cache flushed")
+                    self.uc.ctl_flush_tb()
+                    self.console("[lm-trace] TB cache flushed "
+                                 "(ctl_flush_tb fast path)")
                 except Exception as e:
                     self.console("[lm-trace] flush failed: %r" % (e,))
             if not t.pc:
