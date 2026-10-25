@@ -119,7 +119,7 @@ class EmuThread:
     __slots__ = ("tid", "name", "stack_base", "stack_size", "regs", "pc",
                  "state", "wait", "wake_ns", "extra", "retval",
                  "approx_instr", "errno_cell", "specific", "tlv_bases",
-                 "created_at", "eagl_ctx")
+                 "created_at", "eagl_ctx", "_valve_at", "_valve_fevent")
 
     def __init__(self, tid, name, stack_base, stack_size):
         self.tid = tid
@@ -878,11 +878,76 @@ class FNLoader:
         t.wait = (kind, key)
         t.wake_ns = wake_ns
         t.extra = extra
+        if kind == "cond" and wake_ns is None:
+            # deadlock safety valve bookkeeping: remember when this
+            # UNDATED cond wait started + the FEvent object (x19), so the
+            # scheduler can convert it to a timeout if the completion
+            # source never materialises (see check_deadlock_valve)
+            if getattr(t, "_valve_at", None) is None:
+                t._valve_at = time.time()
+                try:
+                    t._valve_fevent = self.uc.reg_read(
+                        a64.UC_ARM64_REG_X19)
+                except Exception:
+                    t._valve_fevent = 0
         self.stop_reason = "switch"
         try:
             self.uc.emu_stop()
         except Exception:
             pass
+
+    def check_deadlock_valve(self):
+        """Convert forever-cond waits into FEvent TIMEOUTS after a grace
+        window. The engine's FEvent::Wait(0xFFFFFFFF) loops until someone
+        calls Trigger(); when our emulation never delivers the completion
+        (missing async piece) the waiter parks forever while timer
+        pollers keep the scheduler technically alive. state[+0x14]=2 is
+        the FEvent's own 'timed out' result: the engine then follows its
+        NATIVE timeout path (retry/abort) instead of hanging. Runs
+        between slices only (safe context for memory writes)."""
+        grace = float(os.environ.get("FN35_VALVE_SECS", "300"))
+        if grace <= 0 or not self.threads:
+            return
+        now = time.time()
+        for t in list(self.threads.values()):
+            if t.state == "blocked" and t.wait and t.wait[0] == "cond" \
+                    and t.wake_ns is None:
+                if getattr(t, "_valve_at", None) is None:
+                    # restored-from-snapshot waiter (or pre-valve block):
+                    # start its grace window now
+                    t._valve_at = now
+                    if not getattr(t, "_valve_fevent", 0):
+                        t._valve_fevent = t.regs.get(
+                            a64.UC_ARM64_REG_X19, 0) \
+                            if isinstance(t.regs, dict) else 0
+            va = getattr(t, "_valve_at", None)
+            if va is None or t.state != "blocked" \
+                    or not t.wait or t.wait[0] != "cond":
+                continue
+            if now - va < grace:
+                continue
+            fe = getattr(t, "_valve_fevent", 0)
+            t._valve_at = now          # re-arm (retry waits re-timeout)
+            if not fe or not (0x400000000000 <= fe < 0x800000000000):
+                # not a plausible guest object: just force it ready
+                self.console("[valve] tid=0x%x waited %.0fs, no FEvent "
+                             "ptr -> force-ready" % (t.tid, now - va))
+                t.state = "ready"
+                t.wait = None
+                continue
+            try:
+                cur = self.rd32(fe + 0x14)
+            except Exception:
+                continue
+            self.console("[valve] tid=0x%x (%r) waited %.0fs on FEvent "
+                         "0x%x state=%d -> 2 (TIMEOUT result)"
+                         % (t.tid, t.name, now - va, fe, cur))
+            try:
+                self.w32(fe + 0x14, 2)
+            except Exception:
+                pass
+            t.state = "ready"
+            t.wait = None
 
     def wake(self, kind, key, one=True):
         for t in list(self.threads.values()):
@@ -2766,6 +2831,7 @@ class FNLoader:
             self.stop_reason = None
             wall0 = time.time()
             self.heartbeat()
+            self.check_deadlock_valve()
             try:
                 # until=1 (never reached): a PC=0 branch must FAULT so
                 # on_fetch() can capture the caller live instead of the
