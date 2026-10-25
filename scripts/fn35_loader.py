@@ -2599,6 +2599,16 @@ class FNLoader:
                     if _fl == "rangefull":
                         self.uc.ctl_remove_cache(1, 0xFFFFFFF00000)
                         self.console("[lm-trace] TB flushed (range full)")
+                    elif _fl == "regions":
+                        n = 0
+                        for _r in self.uc.mem_regions():
+                            try:
+                                self.uc.ctl_remove_cache(_r[0], _r[1] + 1)
+                                n += 1
+                            except Exception:
+                                pass
+                        self.console("[lm-trace] TB flushed (%d regions)"
+                                     % n)
                     elif _fl == "rangesmall":
                         self.uc.ctl_remove_cache(0x100000000, 0x105900000)
                         self.console("[lm-trace] TB flushed (range small)")
@@ -3082,10 +3092,22 @@ class FNLoader:
     def _pak_container_fallback(self, gpath, host):
         """When a guest .pak path can't be resolved to a host file, serve
         the real pak container from the app's cookeddata tree. Returns
-        the host path or None."""
+        the host path or None.
+
+        FN35_NO_ENGINE_PAK=1 suppresses this: the ENGINE's own pak layer
+        (FPakPlatformFile) then never mounts, and all file reads fall to
+        the physical layer where OUR pakfs materializes entries on
+        demand (the run49-proven model -- the engine-mounted path dies
+        in the desync-corrupted name-table lookup)."""
         if not gpath or not gpath.lower().endswith(".pak"):
             return None
         import os as _os
+        if _os.environ.get("FN35_NO_ENGINE_PAK"):
+            if not getattr(self, "_no_engine_pak_logged", False):
+                self._no_engine_pak_logged = True
+                self.console("[pak-open] engine pak mount suppressed "
+                             "(FN35_NO_ENGINE_PAK; physical model)")
+            return None
         _base = _os.path.basename(gpath.replace("\\", "/")).lower()
         _cand = _os.path.join(
             _os.path.dirname(self.macho_path), "cookeddata",
