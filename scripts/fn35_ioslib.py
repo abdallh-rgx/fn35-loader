@@ -475,22 +475,17 @@ def _pthread_getspecific(l, key):
     v = l.cur.specific.get(key, 0)
     if v:
         return v
-    # The engine (libSystem-style code paths) occasionally dereferences
-    # a getspecific() result WITHOUT a null check (e.g. [x0+0xb4] on
-    # key 10). A raw NULL return crashes the boot. Hand back a lazily
-    # allocated ZERO block for this (thread, key): flags read as 0 and
-    # the code falls into its default/no-op path, which matches what a
-    # freshly-initialized-but-inactive subsystem looks like on XNU.
-    try:
-        z = l.cur.tlv_bases.get(("specz", key))
-    except Exception:
-        z = None
+    z = l.cur.tlv_bases.get(("specz", key))
     if z is None:
         z = l.heap_alloc(0x4000, zero=True)
-        try:
-            l.cur.tlv_bases[("specz", key)] = z
-        except Exception:
-            pass
+        l.cur.tlv_bases[("specz", key)] = z
+        if not getattr(l, "_specz_logged", False):
+            l._specz_logged = True
+            try:
+                l.console("[tls] zero-block stand-in for key=%d tid=0x%x "
+                          "-> 0x%x" % (key, l.cur.tid, z))
+            except Exception:
+                pass
     return z
 
 
