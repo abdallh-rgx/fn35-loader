@@ -1638,7 +1638,12 @@ class FNLoader:
             except Exception:
                 return False
 
-            # execute the access
+            # SAFETY: NO reg_write/mem_write inside the fault callback
+            # (unicorn 2.1.4 corrupts state -> UC_ERR_MAP on the next
+            # emu_start, observed seg-ch recoveries). Instead: read the
+            # needed data here (reads are safe), queue the repair, cut
+            # the slice with emu_stop, and let the scheduler apply the
+            # register/memory writes + PC advance BETWEEN slices.
             import struct as _st
             if is_load:
                 mn = ins.mnemonic
@@ -1654,7 +1659,8 @@ class FNLoader:
                         else (4, "<I")
                 data = bytes(uc.mem_read(true_addr, datasz))
                 val = _st.unpack(fmt, data)[0]
-                self._dsr_reg_write(uc, dst, val)
+                self._dsr_pending = {"kind": "load", "reg": dst,
+                                     "val": val, "pc": pc}
                 action = "load"
             else:
                 src = None
@@ -1669,16 +1675,21 @@ class FNLoader:
                 datasz = 1 if ins.mnemonic == "strb" else \
                     2 if ins.mnemonic == "strh" else \
                     8 if sname.startswith("x") else 4
-                uc.mem_write(true_addr, val.to_bytes(datasz, "little"))
+                self._dsr_pending = {
+                    "kind": "store", "addr": true_addr,
+                    "data": val.to_bytes(datasz, "little"), "pc": pc}
                 action = "store"
 
-            uc.reg_write(a64.UC_ARM64_REG_PC, pc + 4)
             FNLoader._dsr_count += 1
             if FNLoader._dsr_count <= 12 or FNLoader._dsr_count % 1000 == 0:
                 self.console("[dsr] #%d %s fault@0x%x -> true 0x%x "
                              "(%s %s) pc=0x%x"
                              % (FNLoader._dsr_count, action, address,
                                 true_addr, ins.mnemonic, ins.op_str, pc))
+            try:
+                self.uc.emu_stop()       # cut slice; apply between slices
+            except Exception:
+                pass
             return True
         except Exception as e:
             try:
@@ -2633,6 +2644,37 @@ class FNLoader:
                 self.fatal("hook exception %r (pc=0x%x)" % (e, self.reg_pc()))
                 break
             self.save_thread(t)
+            # apply a queued desync repair (the fault callback only
+            # READS; all writes happen here, between slices)
+            _dsr = getattr(self, "_dsr_pending", None)
+            if _dsr is not None:
+                self._dsr_pending = None
+                try:
+                    if _dsr["kind"] == "load":
+                        import unicorn.arm64_const as _a
+                        c = getattr(_a, "UC_ARM64_REG_"
+                                    + _dsr["reg"].upper(), None)
+                        if c is not None:
+                            t.regs[c] = _dsr["val"] & (
+                                0xFFFFFFFF
+                                if _dsr["reg"].startswith("w")
+                                else MASK64)
+                            try:
+                                self.uc.reg_write(c, t.regs[c])
+                            except Exception:
+                                pass
+                    else:
+                        self.uc.mem_write(_dsr["addr"], _dsr["data"])
+                    t.pc = _dsr["pc"] + 4
+                    t.regs[a64.UC_ARM64_REG_PC] = _dsr["pc"] + 4
+                    try:
+                        self.uc.reg_write(a64.UC_ARM64_REG_PC, t.pc)
+                    except Exception:
+                        pass
+                    self.console("[dsr-applied] %s pc=0x%x -> 0x%x"
+                                 % (_dsr["kind"], _dsr["pc"], t.pc))
+                except Exception as e:
+                    self.warn("dsr apply failed %r" % (e,))
             # deferred mmap data-fill (TCG-desync fix: large mem_writes
             # inside hook callbacks corrupt unicorn state): apply BETWEEN
             # slices only
