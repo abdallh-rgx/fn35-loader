@@ -4118,7 +4118,16 @@ def main():
             traceback.print_exc()
             print("[fn35] snapshot save failed: %r" % (e,))
     elif snapdir and l.fatal_msg:
-        # crash snapshot for offline analysis (registers/stack intact)
+        # crash snapshot for RECOVERY + offline analysis. The py_stack
+        # (Python continuation generators) cannot be serialized and is
+        # dead weight after a crash anyway -- drop it so the save works
+        # (the null-call crash path leaves bt-walk entries behind and
+        # the save would otherwise refuse, losing the whole segment).
+        try:
+            l.py_stack = []
+            l.pending_py = None
+        except Exception:
+            pass
         try:
             import fn35_snap
             fn35_snap.save_snapshot(

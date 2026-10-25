@@ -156,6 +156,10 @@ def save_snapshot(l, snapdir, note=""):
     for _fl in ("_kernproc_lm_armed", "_pak_lm_armed", "_uproj_dumped",
                 "_specz_logged", "_pak_served"):
         state.pop(_fl, None)
+    # sync-hook callbacks (local closures -- unpicklable) + transient
+    # dsr repair state: the restore re-arms hooks itself
+    for _fl in ("_sync_cb", "_block_cb", "_dsr_pending"):
+        state.pop(_fl, None)
     for k in _DROP:
         state[k] = None
     state["fds"] = _ser_fds(l)
