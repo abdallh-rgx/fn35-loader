@@ -270,6 +270,11 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
         pass
     _saved = sorted(((r["begin"], r["end"], r["perms"])
                      for r in meta["regions"]), key=lambda x: x[0])
+    # the save-time farm DOES include the zero page (it's part of
+    # mem_regions() once the loader maps it at boot) — drop it here or
+    # the merged bulk map overlaps the pre-map above and the WHOLE
+    # merged mega-region fails, leaving a giant hole (the resume-crash!)
+    _saved = [(b, e, p) for (b, e, p) in _saved if b >= 0x10000]
     _merged = []
     for _b, _e, _p in _saved:
         if _merged and _merged[-1][1] + 1 == _b and _merged[-1][2] == _p:
@@ -280,10 +285,20 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
     for _b, _e, _p in _merged:
         try:
             l.uc.mem_map(_b, _e - _b + 1, _p)
-        except Exception as ex:
-            _map_fail += 1
-            l.console("[snap] mem_map(0x%x, 0x%x) failed: %r"
-                      % (_b, _e - _b + 1, ex))
+        except Exception:
+            # partial overlap with something mapped above: fall back to
+            # page-by-page mapping, skipping pages that already exist
+            _ok = 0
+            for _paddr in range(_b, _e + 1, 0x1000):
+                try:
+                    l.uc.mem_map(_paddr, 0x1000, _p)
+                    _ok += 1
+                except Exception:
+                    pass
+            if _ok == 0:
+                _map_fail += 1
+                l.console("[snap] mem_map(0x%x, 0x%x) fully failed"
+                          % (_b, _e - _b + 1))
     if _map_fail:
         l.console("[snap] WARNING: %d merged map failures" % _map_fail)
     for r in meta["regions"]:

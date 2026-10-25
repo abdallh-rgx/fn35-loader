@@ -1174,7 +1174,6 @@ class FNLoader:
             self._swap_to_block_pending = False
             try:
                 if _sh_mode == "block":
-                    from unicorn import UC_HOOK_BLOCK, UC_HOOK_CODE
                     self._sync_hook_h = self.uc.hook_add(
                         UC_HOOK_BLOCK, _block_sync)
                     self.console("[sync-hook] BLOCK 1-read hook armed "
@@ -1184,7 +1183,6 @@ class FNLoader:
                     # mode desync-crashed init ~253), auto-swap to block
                     # at the portrait milestone for the 6.5x VM-grind
                     # speedup. See the console filter for the swap arm.
-                    from unicorn import UC_HOOK_CODE, UC_HOOK_BLOCK
                     self._sync_hook_h = self.uc.hook_add(
                         UC_HOOK_CODE, _global_sync)
                     self._block_hook_kind = UC_HOOK_BLOCK
@@ -1810,6 +1808,48 @@ class FNLoader:
                 xs = " ".join("x%d=0x%x" % (i, self.reg_x(i))
                               for i in range(9))
                 self.console("[null-call] %s" % xs)
+            except Exception:
+                pass
+            try:
+                # x16/x17: the indirect-branch registers + the GOT slot
+                # the stub loaded (was the slot REALLY zero, or is the
+                # register desynced?)
+                import struct as _st
+                x16 = self.uc.reg_read(a64.UC_ARM64_REG_X16)
+                x17 = self.uc.reg_read(a64.UC_ARM64_REG_X17)
+                self.console("[null-call] x16=0x%x x17=0x%x" % (x16, x17))
+                if x16 == 0 and 0x100000000 <= lr < 0x106000000:
+                    # decode `bl #stub` at lr-4 -> stub -> adrp+ldr -> slot
+                    try:
+                        blw = _st.unpack("<I", bytes(self.rdb(lr - 4, 4)))[0]
+                        if (blw & 0xFC000000) == 0x94000000:
+                            imm = blw & 0x3FFFFFF
+                            if imm & (1 << 25):
+                                imm -= 1 << 26
+                            stub = lr - 4 + (imm << 2)
+                            sc = bytes(self.rdb(stub, 8))
+                            a0 = _st.unpack("<I", sc[0:4])[0]
+                            a1 = _st.unpack("<I", sc[4:8])[0]
+                            if (a0 & 0x9F000000) == 0x90000000 \
+                                    and (a0 & 0x1F) == 16 \
+                                    and (a1 & 0xFFC00000) == 0xF9400000:
+                                pimm = ((a0 >> 5) & 0x7FFFF) << 12
+                                if pimm & (1 << 32):
+                                    pimm -= 1 << 33
+                                base = (stub & ~0xFFF) + pimm
+                                off = ((a1 >> 10) & 0xFFF) << 3
+                                slot = base + off
+                                v = _st.unpack("<Q", bytes(
+                                    self.rdb(slot, 8)))[0]
+                                self.console(
+                                    "[null-call] stub 0x%x -> GOT slot "
+                                    "0x%x actually = 0x%x%s"
+                                    % (stub, slot, v,
+                                       "  <-- REAL ZERO" if v == 0
+                                       else "  <-- REGISTER DESYNC"))
+                    except Exception as e:
+                        self.console("[null-call] slot walk failed: %r"
+                                     % (e,))
             except Exception:
                 pass
             # last stub calls -- WHICH stub returned into this state?
