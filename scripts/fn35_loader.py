@@ -1174,7 +1174,7 @@ class FNLoader:
             self._swap_to_block_pending = False
             try:
                 if _sh_mode == "block":
-                    from unicorn import UC_HOOK_BLOCK
+                    from unicorn import UC_HOOK_BLOCK, UC_HOOK_CODE
                     self._sync_hook_h = self.uc.hook_add(
                         UC_HOOK_BLOCK, _block_sync)
                     self.console("[sync-hook] BLOCK 1-read hook armed "
