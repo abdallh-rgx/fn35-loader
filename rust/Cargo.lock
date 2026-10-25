@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "fn35-macho"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "fn35-metal"
 version = "0.1.0"
 dependencies = [

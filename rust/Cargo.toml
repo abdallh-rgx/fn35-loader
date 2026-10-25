@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["fn35-metal", "fn35-metal-ffi"]
+members = ["fn35-metal", "fn35-metal-ffi", "fn35-macho"]
 
 [profile.release]
 opt-level = 3

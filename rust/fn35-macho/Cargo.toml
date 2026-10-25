@@ -1,0 +1,11 @@
+[package]
+name = "fn35-macho"
+version = "0.1.0"
+edition = "2021"
+description = "Safe-Rust Mach-O (iOS ARM64) parser mirroring scripts/fn35_macho.py 1:1"
+license = "MIT"
+
+[dependencies]
+
+[dev-dependencies]
+serde_json = "1"
