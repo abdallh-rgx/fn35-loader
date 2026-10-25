@@ -185,3 +185,32 @@ Stage Summary:
 - Everything recovered; no progress lost (all session 2-3 fixes are in git)
 - segAK running; frontier expected: pak-layer .uproject read blocker
   (session 3's REMAINING BLOCKER)
+
+---
+Task ID: vm-diagnosis (2025-10-25 session 4)
+Agent: main (Z.ai)
+Task: Diagnose the MainAppThread 'eternal loop' (0x101838ab0-0x101839660)
+
+Work Log:
+- Frame-chain walk from snapshot: trampoline -> 0x101885c24 (caller-A:
+  compare+usleep(100) retry) -> 0x1026e0c28 (caller-B) -> LOOP-FN
+  @ 0x101838970 (only 2 xrefs in the whole binary)
+- x1 = WIDE STRING '../../../FortniteGame/FortniteGame.uproject -es2'
+  (the engine command line); x20 = 'bCommandLineReady' selector
+- objc_dump.py: IOSAppDelegate HAS all three timer IMPs
+  (NoUrlCommandLine=0x102805170 etc.) - not a missing-IMP issue
+- run38.log forensics: the SAME loop faulted at 0x101839580 in the OLD
+  code after thread_policy_set - the loop is post-mach-setup code
+- disassembly decoded: the 'hash churn' is an UNALIGNED 32-bit
+  BITSTREAM READER ([sp+0x780]=base + [sp+0x770]=idx, read two words,
+  shift/combine). LOOP-FN = an obfuscator VM INTERPRETER (bytecode in
+  __DATA at 0x1043eb370) executing the engine's launch code
+- probe_vmpos.py: idx ADVANCES MONOTONICALLY (0x29ef60 -> 0x2c4e74 over
+  24M hits) - REAL WORK, NOT STUCK. Sync hook (1 reg read) = mandatory
+  for correctness (probe without it phantom-faults at 0x97ceba93)
+
+Stage Summary:
+- VERDICT: not a bug; the engine launch runs as obfuscated VM bytecode
+  under emulation. Old runs passed the same code (run38 trace confirms)
+- Path forward: chain segments (~0.45M instr/s); expect [icu-stat] +
+  LogInit once the VM finishes the launch blob
