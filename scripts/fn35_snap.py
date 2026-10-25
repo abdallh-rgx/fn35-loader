@@ -400,6 +400,18 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
               "vclock advanced %.1fs past save"
               % (len(meta["regions"]), restored / 1e6, l.phase,
                  (l.vclock - meta.get("vclock", l.vclock)) / 1e9))
+    # TLB/TB STALENESS FIX: every CRC/AES table-loop phantom fault
+    # (impossible addresses from valid register dumps) happened on
+    # RESUMED runs only -- fresh boots never crash there. unicorn 2.1.4
+    # keeps stale translation/TLB state across the unmap/remap churn of
+    # the restore; flushing the code cache post-restore clears it.
+    # Direct ctl_remove_cache here can DEADLOCK (observed run102 hang);
+    # defer to the scheduler's first slice boundary instead (slice 1 is
+    # only 5M instructions -- far below the ~100M where corruption
+    # manifests).
+    l._lm_flush_pending = True
+    l.console("[snap] TB flush deferred to first slice boundary "
+              "(TLB staleness fix)")
     return l
 
 

@@ -989,11 +989,19 @@ class FNLoader:
             self.uc.mem_map(self.WEAKOBJ_CAVE, 0x1000, 7)
         except UcError:
             pass
-        asm = ("movz x4, #0\n"
-               "movk x4, #0x405E, lsl #48\n"       # x4 = 120.0 (double)
+        # build the constant 3600.0 directly (bits of the double): the
+        # async pak mount + name-table build takes MINUTES under
+        # emulation; the old 120s cutoff made the engine give up
+        # mid-mount ('Failed to read file ...uproject' early exit).
+        import struct as _s
+        _900 = _s.unpack("<Q", _s.pack("<d", 3600.0))[0]
+        asm = ("movz x4, #0x%x\n"
+               "movk x4, #0x%x, lsl #16\n"
+               "movk x4, #0x%x, lsl #32\n"
+               "movk x4, #0x%x, lsl #48\n"       # x4 = 3600.0 (double)
                "fmov d3, x4\n"
                "fcmp d0, d3\n"
-               "b.le 0x%x\n"                        # within 120s -> normal
+               "b.le 0x%x\n"                        # within 3600s -> normal
                "mov w0, #0\n"                       # give up: pretend ok
                "ldp x29, x30, [sp, #0x20]\n"
                "ldp x20, x19, [sp, #0x10]\n"
@@ -1002,10 +1010,12 @@ class FNLoader:
                "mov x0, x19\n"
                "bl 0x101391084\n"                   # original timeout hdlr
                "b 0x10101904c"                      # back into the loop
-               % (CAVE + 0x28,))
+               % (_900 & 0xFFFF, (_900 >> 16) & 0xFFFF,
+                  (_900 >> 32) & 0xFFFF, (_900 >> 48) & 0xFFFF,
+                  CAVE + 0x30))
         enc, _ = ks.asm(asm, addr=CAVE)
         body = bytes(enc)
-        if len(body) != 52:
+        if len(body) > 80:
             self.console("[wait-guard] BAD ASSEMBLY len=%d" % len(body))
             return
         try:
@@ -1016,7 +1026,7 @@ class FNLoader:
             self.uc.ctl_remove_cache(self.WEAKOBJ_CAVE,
                                       self.WEAKOBJ_CAVE + 0x1000)
             self._wait_giveup_arm = time.time()
-            self.console("[wait-guard] armed: Wait>120s -> return 0 "
+            self.console("[wait-guard] armed: Wait>3600s -> return 0 "
                          "(cave 0x%x)" % CAVE)
         except Exception as e:
             self.console("[wait-guard] FAILED: %r" % (e,))
@@ -1707,6 +1717,20 @@ class FNLoader:
     def dispatch_stub(self, addr):
         name = self.addr2stub[addr]
         self.stub_calls[name] += 1
+        # stub-storm heartbeat: the scheduler loop can stall INSIDE one
+        # slice for minutes when the guest hammers stubs (mutex waits);
+        # the regular heartbeat never gets a slice boundary to fire at.
+        self._stub_hb_n = getattr(self, "_stub_hb_n", 0) + 1
+        if self._stub_hb_n >= 200000:
+            self._stub_hb_n = 0
+            top = self.stub_calls.most_common(6)
+            self.console("[stub-hb] 200k stubs: %s | pc=0x%x thr=%s"
+                         % (", ".join("%s:%d" % (n, c) for n, c in top),
+                            self.reg_pc(),
+                            self.cur.name if self.cur else "?"))
+            # decay so each report shows the CURRENT storm, not history
+            for k in list(self.stub_calls.keys()):
+                self.stub_calls[k] = self.stub_calls[k] // 2
         lr = self.uc.reg_read(XREGS[30])
         args = [self.reg_x(i) for i in range(8)]
         # stack-passed args (9th+) live at [sp], [sp+8]... for fixed
@@ -2357,6 +2381,19 @@ class FNLoader:
                 self.fatal("hook exception %r (pc=0x%x)" % (e, self.reg_pc()))
                 break
             self.save_thread(t)
+            # deferred mmap data-fill (TCG-desync fix: large mem_writes
+            # inside hook callbacks corrupt unicorn state): apply BETWEEN
+            # slices only
+            dw = getattr(self, "_deferred_writes", None)
+            if dw:
+                self._deferred_writes = []
+                for wa, wd in dw:
+                    try:
+                        self.wrb(wa, wd)
+                    except Exception as e:
+                        self.warn("deferred mmap fill 0x%x failed %r"
+                                  % (wa, e))
+                self._need_flush = False
             # deferred TB flush (armed mid-emulation): safe between slices
             if getattr(self, "_lm_flush_pending", False):
                 self._lm_flush_pending = False
@@ -2743,8 +2780,21 @@ class FNLoader:
         if ent[0] == "console":
             return 0
         if ent[0] == "file":
+            pos0 = ent[1].tell()
             data = ent[1].read(min(count, 1 << 24))
+            if os.environ.get("FN35_TRACE_READ") and \
+                    len(data) >= 0x1000:
+                self.console("[rd] fd=%d n=%d off=%d -> %d%s"
+                             % (fd, count, pos0, len(data),
+                                " EOF" if len(data) < count else ""))
             if data:
+                # NOTE: write IMMEDIATELY. A deferral experiment (moving
+                # large writes to slice boundaries) starved same-slice
+                # consumers: the guest reads the buffer right after the
+                # stub returns, so deferred data = zeros -> entry header
+                # parse failures. The phantom CRC faults that motivated
+                # it were actually TLB staleness from snapshot restore,
+                # fixed by the post-restore TB flush in fn35_snap.
                 self.wrb(buf, data)
                 self._png_trace(fd, buf, data, "read")
             return len(data)
@@ -2936,14 +2986,22 @@ class FNLoader:
                 # produced IHDR CRC errors on perfectly valid files.
                 # POSIX mmap also must NOT move the fd's file position,
                 # so save/restore it.
+                # (kept immediate)
+                # callback can corrupt unicorn's execution state (the
+                # CRC/AES-table impossible-address crashes). DEFER the
+                # buffer fill to the slice boundary (applied between
+                # emu_start calls, like the TB flush) unless disabled
+                # with FN35_MMAP_NOWRITE=1 (debug).
                 pos0 = ent[1].tell()
                 try:
                     ent[1].seek(offset)
                     data = ent[1].read(min(length, 1 << 28))
-                    if data:
-                        self.wrb(p, data)
                 finally:
                     ent[1].seek(pos0)
+                if data:
+                    # write IMMEDIATELY (same-slice consumers read the
+                    # mapping right after mmap returns)
+                    self.wrb(p, data)
         return p
 
     def sys_sysctl(self, namep, count, oldp, oldlenp):
@@ -2957,16 +3015,6 @@ class FNLoader:
             nm = None
         val = sysctl_bytes(nm) if nm else None
         if val is None:
-            # kinfo_proc queries fire immediately before the project-file
-            # read failure -- arm the lastmile ring to capture the exact
-            # decision path (once)
-            if mib[:2] == (1, 14) and \
-                    not getattr(self, "_kernproc_lm_armed", False):
-                self._kernproc_lm_armed = True
-                try:
-                    self.arm_lastmile_trace(1_000_000)
-                except Exception:
-                    pass
             self.console("[kernel] sysctl mib=%s -> ENOENT" % (mib,))
             return -2
         avail = self.rd64(oldlenp) if oldlenp else 0
