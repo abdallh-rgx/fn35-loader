@@ -1446,11 +1446,186 @@ class FNLoader:
                 return self.on_fetch(address)
             if self.maybe_grow(address):
                 return True
+            if self.try_desync_repair(uc, access, address, size):
+                return True
             self.diagnose_data_fault(access, address, size)
             return False
         except Exception as e:
             self.console("[dbg] hook_mem_invalid raised %r" % (e,))
             raise
+
+    # ------------------------------------------------------------------
+    # TCG-desync self-repair: unicorn 2.1.4 sometimes computes a data
+    # fault address from STALE TCG-local register state while the
+    # committed (reg_read-visible) state is CORRECT (proven by crash
+    # snapshots: x11 valid at a fault at a garbage address; the fault
+    # address is arithmetically unreachable from the committed regs).
+    # Fix: decode the faulting access, recompute the true address from
+    # COMMITTED registers, emulate the load/store, and skip the insn.
+    # ------------------------------------------------------------------
+    _dsr_md = None
+    _dsr_count = 0
+
+    def _dsr_reg(self, uc, rname):
+        import unicorn.arm64_const as _a64
+        c = getattr(_a64, "UC_ARM64_REG_" + rname.upper(), None)
+        return uc.reg_read(c) if c is not None else 0
+
+    def try_desync_repair(self, uc, access, address, size):
+        try:
+            if os.environ.get("FN35_NO_DSR"):
+                return False
+            pc = self.reg_pc()
+            if not (0x100000000 <= pc < 0x105900000):
+                return False
+            code = bytes(uc.mem_read(pc, 4))
+            if len(code) < 4:
+                return False
+            import capstone
+            from capstone.arm64 import (ARM64_OP_REG, ARM64_OP_IMM,
+                                        ARM64_OP_MEM)
+            if FNLoader._dsr_md is None:
+                _md = capstone.Cs(capstone.CS_ARCH_ARM64,
+                                 capstone.CS_MODE_LITTLE_ENDIAN)
+                _md.detail = True
+                FNLoader._dsr_md = _md
+            md = FNLoader._dsr_md
+            try:
+                ins = next(md.disasm(code, pc))
+            except StopIteration:
+                return False
+
+            is_load = ins.mnemonic in ("ldr", "ldur", "ldrb", "ldrh",
+                                       "ldrsh", "ldrsw", "ldrsb")
+            is_store = ins.mnemonic in ("str", "stur", "strb", "strh")
+            if not (is_load or is_store):
+                return False
+
+            ops = ins.operands
+            if len(ops) < 2:
+                return False
+            memop = None
+            for o in ops:
+                if o.type == ARM64_OP_MEM:
+                    memop = o
+            if memop is None:
+                return False
+            m = memop.mem
+
+            base = self._dsr_reg(uc, ins.reg_name(m.base)) if m.base else 0
+            if m.index:
+                idx = self._dsr_reg(uc, ins.reg_name(m.index))
+                if ins.reg_name(m.index).startswith("w"):
+                    idx &= 0xFFFFFFFF       # uxtw semantics
+                try:
+                    sh = memop.shift.value
+                except Exception:
+                    sh = 0
+                idx <<= sh
+                base += idx
+            true_addr = (base + m.disp) & MASK64
+
+            # PAIR-FOLD: the faulting load's base was often computed by
+            # the PRECEDING 'add Xt, Xn, Xm{, uxtw #s}' -- which may
+            # itself have consumed the stale value (committed Xt is
+            # then garbage). Recompute from the add's SOURCES instead
+            # (they were committed before the desync window).
+            pair_addr = None
+            try:
+                pre = bytes(uc.mem_read(pc - 4, 4))
+                pins = next(md.disasm(pre, pc - 4))
+                if pins.mnemonic in ("add", "add x", "add w") and \
+                        len(pins.operands) == 3 and \
+                        pins.operands[1].type == ARM64_OP_REG and \
+                        pins.operands[2].type == ARM64_OP_REG:
+                    nd = pins.reg_name(pins.operands[0].reg)
+                    n1 = pins.reg_name(pins.operands[1].reg)
+                    n2 = pins.reg_name(pins.operands[2].reg)
+                    if m.base and ins.reg_name(m.base) == nd:
+                        pbase = self._dsr_reg(uc, n1)
+                        pidx = self._dsr_reg(uc, n2)
+                        if n2.startswith("w"):
+                            pidx &= 0xFFFFFFFF
+                        try:
+                            psh = pins.operands[2].shift.value
+                        except Exception:
+                            psh = 0
+                        pidx <<= psh
+                        pair_addr = (pbase + pidx + m.disp) & MASK64
+            except StopIteration:
+                pass
+            except Exception:
+                pair_addr = None
+
+            if true_addr == address and pair_addr is None:
+                return False            # not a desync (real bad address)
+            # prefer the pair recompute when available
+            if pair_addr is not None and pair_addr != address:
+                try:
+                    uc.mem_read(pair_addr, 1)
+                    true_addr = pair_addr
+                except Exception:
+                    pass
+            try:
+                uc.mem_read(true_addr, 1)        # must be mapped
+            except Exception:
+                return False
+
+            # execute the access
+            import struct as _st
+            if is_load:
+                mn = ins.mnemonic
+                dst = ins.reg_name(ops[0].reg)
+                if mn in ("ldrb", "ldrsb"):
+                    datasz, fmt = 1, "<B"
+                elif mn in ("ldrh", "ldrsh"):
+                    datasz, fmt = 2, "<H"
+                elif mn == "ldrsw":
+                    datasz, fmt = 4, "<i"
+                else:
+                    datasz, fmt = (8, "<Q") if dst.startswith("x") \
+                        else (4, "<I")
+                data = bytes(uc.mem_read(true_addr, datasz))
+                val = _st.unpack(fmt, data)[0]
+                self._dsr_reg_write(uc, dst, val)
+                action = "load"
+            else:
+                src = None
+                for o in ops:
+                    if o.type == ARM64_OP_REG:
+                        src = o
+                        break
+                if src is None:
+                    return False
+                sname = ins.reg_name(src.reg)
+                val = self._dsr_reg(uc, sname)
+                datasz = 1 if ins.mnemonic == "strb" else \
+                    2 if ins.mnemonic == "strh" else \
+                    8 if sname.startswith("x") else 4
+                uc.mem_write(true_addr, val.to_bytes(datasz, "little"))
+                action = "store"
+
+            uc.reg_write(a64.UC_ARM64_REG_PC, pc + 4)
+            FNLoader._dsr_count += 1
+            if FNLoader._dsr_count <= 12 or FNLoader._dsr_count % 1000 == 0:
+                self.console("[dsr] #%d %s fault@0x%x -> true 0x%x "
+                             "(%s %s) pc=0x%x"
+                             % (FNLoader._dsr_count, action, address,
+                                true_addr, ins.mnemonic, ins.op_str, pc))
+            return True
+        except Exception as e:
+            try:
+                self.console("[dsr] repair failed %r" % (e,))
+            except Exception:
+                pass
+            return False
+
+    def _dsr_reg_write(self, uc, rname, val):
+        import unicorn.arm64_const as _a64
+        c = getattr(_a64, "UC_ARM64_REG_" + rname.upper(), None)
+        if c is not None:
+            uc.reg_write(c, val & (0xFFFFFFFF if rname.startswith("w")
+                                   else MASK64))
 
     def arm_lastmile_trace(self, n=1_500_000):
         """Bounded per-instruction ring, armed at a console milestone.
@@ -2414,10 +2589,23 @@ class FNLoader:
                 # it, doing only 10 dyld inits in 420s). ctl_flush_tb()
                 # is the dedicated O(1) full-flush API (UC_CTL_TB_FLUSH)
                 # and achieves the same post-restore staleness fix.
+                # FN35_FLUSH selects: tb (default) | rangesmall (the
+                # guest code span only, ~90MB sweep) | rangefull (the
+                # original 17TB sweep). segAV showed ctl_flush_tb alone
+                # still desyncs at the AES table loops on resumed runs;
+                # testing whether the range variant has extra magic.
+                _fl = os.environ.get("FN35_FLUSH", "tb")
                 try:
-                    self.uc.ctl_flush_tb()
-                    self.console("[lm-trace] TB cache flushed "
-                                 "(ctl_flush_tb fast path)")
+                    if _fl == "rangefull":
+                        self.uc.ctl_remove_cache(1, 0xFFFFFFF00000)
+                        self.console("[lm-trace] TB flushed (range full)")
+                    elif _fl == "rangesmall":
+                        self.uc.ctl_remove_cache(0x100000000, 0x105900000)
+                        self.console("[lm-trace] TB flushed (range small)")
+                    else:
+                        self.uc.ctl_flush_tb()
+                        self.console("[lm-trace] TB cache flushed "
+                                     "(ctl_flush_tb fast path)")
                 except Exception as e:
                     self.console("[lm-trace] flush failed: %r" % (e,))
             if not t.pc:
