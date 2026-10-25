@@ -1507,7 +1507,11 @@ class FNLoader:
 
     def try_desync_repair(self, uc, access, address, size):
         try:
-            if os.environ.get("FN35_NO_DSR"):
+            if not os.environ.get("FN35_DSR"):
+                # DSR disabled by default: emu_stop from inside the
+                # fault callback leaves a UC_ERR_MAP loop on resume.
+                # The resume-time instruction skip (fn35_snap) handles
+                # the same crash class safely instead.
                 return False
             pc = self.reg_pc()
             if not (0x100000000 <= pc < 0x105900000):

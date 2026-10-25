@@ -416,6 +416,29 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
     l._lm_flush_pending = True
     l.console("[snap] TB flush deferred to first slice boundary "
               "(TLB staleness fix)")
+    # ---- crash-resume poison skip -------------------------------------
+    # Random TCG-desync crashes leave a thread parked ON the faulting
+    # load/store with a garbage env register; a plain resume re-faults
+    # forever. The committed register state is usually otherwise valid,
+    # so skip exactly that one instruction (outside any callback --
+    # perfectly safe, unlike mid-fault reg writes).
+    try:
+        _note = str(meta.get("note", ""))
+        if _note.startswith("crash"):
+            import re as _re
+            _m = _re.search(r"pc=0x([0-9a-fA-F]+)", _note)
+            if _m:
+                _fpc = int(_m.group(1), 16)
+                for _t in l.threads.values():
+                    if _t.pc == _fpc and _t.state == "ready":
+                        _t.pc = _fpc + 4
+                        import fn35_loader as _FL2
+                        _t.regs[_FL2.a64.UC_ARM64_REG_PC] = _fpc + 4
+                        l.console("[snap] crash-resume: skipped faulting "
+                                  "insn at 0x%x -> 0x%x" % (_fpc, _fpc + 4))
+                        break
+    except Exception as e:
+        l.console("[snap] poison-skip failed %r" % (e,))
     # sync-hook mode restore: if the snapshot was saved mid-VM-grind the
     # BLOCK swap already fired -- re-arm BLOCK directly (the fresh
     # loader instance above re-armed CODE in auto mode)
