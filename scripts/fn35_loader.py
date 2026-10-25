@@ -1858,7 +1858,9 @@ class FNLoader:
             self.dump_lastmile()
             try:
                 xs = " ".join("x%d=0x%x" % (i, self.reg_x(i))
-                              for i in range(9))
+                              for i in range(0, 9))
+                xs += " " + " ".join("x%d=0x%x" % (i, self.reg_x(i))
+                                     for i in range(19, 29))
                 self.console("[null-call] %s" % xs)
             except Exception:
                 pass

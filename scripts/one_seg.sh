@@ -15,9 +15,10 @@ CRASHES_FILE=$F35/.chain_crashes
 CRASHPC_FILE=$F35/.chain_crashpc
 
 # past the init table? (any recent log saw didFinishLaunching) -> BLOCK
-if ls -t "$F35"/loc_*.log 2>/dev/null | head -3 | xargs grep -l "didFinishLaunching" 2>/dev/null | grep -q .; then
-  export FN35_SYNC_HOOK=block
-fi
+# past the init table (init 773/773 + didFinishLaunching done 2026-10-25):
+# BLOCK sync from here on; swap logic lives in the loader (auto) only
+# for fresh boots.
+export FN35_SYNC_HOOK=block
 
 LOG=$F35/loc_$(date +%m%d_%H%M%S).log
 timeout 575 python3 -u fn35_loader.py > "$LOG" 2>&1
