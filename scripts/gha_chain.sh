@@ -10,7 +10,13 @@
 set -u
 cd /home/z/my-project/scripts
 
-export FN35_SYNC_HOOK=${FN35_SYNC_HOOK:-auto}
+export FN35_SYNC_HOOK=${FN35_SYNC_HOOK:-block}
+# was 'auto' (CODE hooks, swapping to BLOCK at the portrait milestone):
+# the mid-boot swap correlates with the runner's garbage-PC desync
+# storm after the pak mount (window-1: 24 segments, zero milestones,
+# exec-fetch faults at instruction-encoding PCs). Local one_seg.sh
+# has run BLOCK-from-start on fresh boots all session with zero
+# crashes (init 773/773 in one segment) - match that.
 export FN35_BUDGET=${FN35_BUDGET:-500}
 export FN35_SNAPSHOT=/home/z/my-project/fn35/snap
 # forensics: every guest _open (with host-exists check) + every >=4KB
