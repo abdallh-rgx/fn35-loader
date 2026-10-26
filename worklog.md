@@ -648,3 +648,29 @@ Next:
 - Watch the local phys chain for the uproject gate (open-proj lines)
 - Watch runner window-1 end ~23:09Z; decide mode strategy from its state
 - Next Z3/Rust module while segments grind
+
+---
+Task ID: session-8 (continued, 20:40Z)
+
+Work Log:
+- PHYS CHAIN BREAKTHROUGH SEQUENCE:
+  * segment 7: LogStreaming milestones (plugins configured 10.037s,
+    old logs deleted) then FATAL pc=0 on a worker pthread
+  * root cause chain: [valve] MainAppThread "waited 2895s" on FEvent
+    0x640000b04420 -> STALE _valve_at (set 48 min earlier, never
+    cleared on wake) -> the NEW legit park fired the valve INSTANTLY
+    -> engine timeout path -> 19x NSLog storm -> NULL-vtable virtual
+    call crash (ldr x0,[x19,#0x20] == NULL -> blr 0)
+  * THE FIX: fresh-window rule (unblocked threads clear _valve_at; each
+    park measures its own grace) + default grace 300->3600s
+  * segment 8 (post-fix): FULL BUDGET, NO CRASH, and the event resolved
+    naturally: "Async Loading initialized: Event Driven Loader: true,
+    Async Loading Thread: false, Async Post Load: true" - NEW DEEPEST
+    POINT EVER (beyond the w2 runner and all prior local runs)
+- engine boot sequence position: plugins -> logs -> async-loader ->
+  (next: asset registry, engine init, Slate, RHI)
+
+Stage Summary:
+- The phys-model local chain is the deepest universe now
+- Valve fresh-window fix = the difference between a crashing timeout
+  path and a healthy signaled wait
