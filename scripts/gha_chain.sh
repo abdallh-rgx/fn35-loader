@@ -13,6 +13,11 @@ cd /home/z/my-project/scripts
 export FN35_SYNC_HOOK=${FN35_SYNC_HOOK:-auto}
 export FN35_BUDGET=${FN35_BUDGET:-500}
 export FN35_SNAPSHOT=/home/z/my-project/fn35/snap
+# forensics: every guest _open (with host-exists check) + every >=4KB
+# read (fd/offset/result) — would have cracked the w2 uproject
+# read-failure mystery on the spot
+export FN35_LOG_OPEN=${FN35_LOG_OPEN:-1}
+export FN35_TRACE_READ=${FN35_TRACE_READ:-1}
 export EGL_PLATFORM=surfaceless
 export LIBGL_ALWAYS_SOFTWARE=1
 export GALLIUM_DRIVER=llvmpipe
@@ -25,6 +30,16 @@ CRASHPC_FILE=$F35/.chain_crashpc
 DEADLINE=${CHAIN_DEADLINE_EPOCH:-0}
 SEGMAX=${CHAIN_SEGMAX:-1000}
 mkdir -p "$F35"
+
+# phys-pak model persistence across windows: the mode survives in the
+# state artifact as a marker file (.phys_mode uploaded alongside snap)
+if [ -f "$F35/.phys_mode" ]; then
+  export FN35_NO_ENGINE_PAK=1
+fi
+if [ "${FN35_NO_ENGINE_PAK:-}" = "1" ]; then
+  touch "$F35/.phys_mode"
+  echo "[gha-chain] phys-pak model ON (engine pak layer bypassed)" >> "$CONSOLE"
+fi
 
 # pick sync mode smartly: if a deep snapshot exists, BLOCK is 6.5x faster
 if [ -f "$F35/snap/index.json" ]; then
