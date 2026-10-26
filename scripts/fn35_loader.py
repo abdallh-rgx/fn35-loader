@@ -904,22 +904,37 @@ class FNLoader:
         pollers keep the scheduler technically alive. state[+0x14]=2 is
         the FEvent's own 'timed out' result: the engine then follows its
         NATIVE timeout path (retry/abort) instead of hanging. Runs
-        between slices only (safe context for memory writes)."""
-        grace = float(os.environ.get("FN35_VALVE_SECS", "300"))
+        between slices only (safe context for memory writes).
+
+        FRESH-WINDOW RULE: any thread that is NOT (currently) blocked
+        gets its _valve_at cleared -- the grace must measure the
+        CURRENT continuous park, not carry a timestamp from an earlier
+        wait. A stale timestamp fired the valve IMMEDIATELY on a brand-
+        new legitimate wait (MainAppThread parked after 'delete old
+        logs' with a 2895s-old stamp -> instant TIMEOUT -> the engine's
+        broken timeout path -> 19x NSLog storm -> NULL-vtable crash on a
+        worker). The event WAS going to be signalled; we killed it."""
+        grace = float(os.environ.get("FN35_VALVE_SECS", "3600"))
         if grace <= 0 or not self.threads:
             return
         now = time.time()
         for t in list(self.threads.values()):
-            if t.state == "blocked" and t.wait and t.wait[0] == "cond" \
-                    and t.wake_ns is None:
-                if getattr(t, "_valve_at", None) is None:
-                    # restored-from-snapshot waiter (or pre-valve block):
-                    # start its grace window now
-                    t._valve_at = now
-                    if not getattr(t, "_valve_fevent", 0):
-                        t._valve_fevent = t.regs.get(
-                            a64.UC_ARM64_REG_X19, 0) \
-                            if isinstance(t.regs, dict) else 0
+            if t.state != "blocked":
+                # running/ready/done: next park starts a fresh window
+                if getattr(t, "_valve_at", None) is not None:
+                    t._valve_at = None
+                continue
+            if not t.wait or t.wait[0] != "cond" or t.wake_ns is not None:
+                continue  # timed wait / other kind: not valve business
+            # now t is blocked on a FOREVER cond: start/refresh window
+            if getattr(t, "_valve_at", None) is None:
+                # restored-from-snapshot waiter (or first block):
+                # start its grace window now
+                t._valve_at = now
+                if not getattr(t, "_valve_fevent", 0):
+                    t._valve_fevent = t.regs.get(
+                        a64.UC_ARM64_REG_X19, 0) \
+                        if isinstance(t.regs, dict) else 0
             va = getattr(t, "_valve_at", None)
             if va is None or t.state != "blocked" \
                     or not t.wait or t.wait[0] != "cond":
