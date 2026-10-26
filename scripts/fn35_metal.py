@@ -110,6 +110,17 @@ class MetalFFI:
         L.fn35_metal_obj_kind.argtypes = [u64]
         L.fn35_metal_obj_kind.restype = u32
         L.fn35_metal_live_count.restype = u32
+        # --- compute extension (session 8) ---
+        L.fn35_metal_cpipe_new.argtypes = [u64]
+        L.fn35_metal_cpipe_new.restype = u64
+        L.fn35_metal_smp_new.argtypes = [u64, u32]
+        L.fn35_metal_smp_new.restype = u64
+        L.fn35_metal_enc_compute.argtypes = [u64]
+        L.fn35_metal_enc_compute.restype = u32
+        L.fn35_metal_enc_setcpipe.argtypes = [u64, u64]
+        L.fn35_metal_enc_setcpipe.restype = u32
+        L.fn35_metal_enc_dispatch.argtypes = [u64, u64, u64, u64]
+        L.fn35_metal_enc_dispatch.restype = u32
         rc = L.fn35_metal_init()
         if rc != 0:
             raise RuntimeError("fn35_metal_init -> %d" % rc)
@@ -379,6 +390,27 @@ def selftest():
                 got = f.lib.fn35_metal_fence_signal(cur_h)
             elif op == "OP_FENCE_WAIT":
                 got = f.lib.fn35_metal_fence_wait(cur_h)
+            elif op == "OP_CPIPE_NEW":
+                nh = f.lib.fn35_metal_cpipe_new(cur_h)
+                if nh:
+                    slots[h] = nh
+                else:
+                    got = f.lib.fn35_metal_last_error()
+            elif op == "OP_SMP_NEW":
+                nh = f.lib.fn35_metal_smp_new(cur_h, U32(off))
+                if nh:
+                    slots[h] = nh
+                else:
+                    got = f.lib.fn35_metal_last_error()
+            elif op == "OP_ENC_COMPUTE":
+                got = f.lib.fn35_metal_enc_compute(cur_h)
+            elif op == "OP_ENC_SETCPIPE":
+                p = off % 4 if off >= 0 else off
+                ph = slots[p] if 0 <= p < 4 else None
+                got = f.lib.fn35_metal_enc_setcpipe(cur_h, ph or 0)
+            elif op == "OP_ENC_DISPATCH":
+                got = f.lib.fn35_metal_enc_dispatch(cur_h, U64(x), U64(y),
+                                                    U64(w))
             elif op == "OP_RELEASE":
                 got = f.release(cur_h)
                 if got == 0:

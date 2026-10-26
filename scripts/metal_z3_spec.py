@@ -59,11 +59,14 @@ OPS = ["OP_NOP", "OP_DEV_NEW", "OP_QUEUE_NEW", "OP_CB_NEW", "OP_ENCODE",
        "OP_RPASS_NEW", "OP_RPASS_ATTACH", "OP_ENC_RPASS",
        "OP_PIPELINE_NEW", "OP_ENC_SETPIPE", "OP_ENC_DRAW",
        "OP_ENC_BLIT", "OP_TEX_READ",
-       "OP_FENCE_NEW", "OP_FENCE_SIGNAL", "OP_FENCE_WAIT"]
+       "OP_FENCE_NEW", "OP_FENCE_SIGNAL", "OP_FENCE_WAIT",
+       # --- compute extension (session 8) ---
+       "OP_CPIPE_NEW", "OP_ENC_COMPUTE", "OP_ENC_SETCPIPE",
+       "OP_ENC_DISPATCH", "OP_SMP_NEW"]
 
 KINDS = ["K_NONE", "K_DEVICE", "K_QUEUE", "K_CMDBUF",
          "K_BUFFER", "K_TEXTURE", "K_LIBRARY",
-         "K_RPASS", "K_PIPELINE", "K_FENCE"]
+         "K_RPASS", "K_PIPELINE", "K_FENCE", "K_CPIPE", "K_SMP"]
 
 
 def build_sorts():
@@ -94,6 +97,8 @@ class ModelState:
         self.pipe_valid = [0] * n_handles  # pipeline -> has vertex fn
         self.signaled = [0] * n_handles  # fence -> 0/1
         self.cb_pipe = [-1] * n_handles  # cmdbuf -> bound pipeline
+        # --- compute extension state ---
+        self.cb_cpipe = [-1] * n_handles  # cmdbuf -> bound cpipe
 
     def clone(self):
         m = ModelState(self.n)
@@ -103,6 +108,7 @@ class ModelState:
         m.tex_levels = list(self.tex_levels)
         m.attach = list(self.attach); m.pipe_valid = list(self.pipe_valid)
         m.signaled = list(self.signaled); m.cb_pipe = list(self.cb_pipe)
+        m.cb_cpipe = list(self.cb_cpipe)
         return m
 
 
@@ -248,12 +254,12 @@ def step_concrete(m: ModelState, op: str, h: int, off: int, ln: int,
                     return E_KIND   # still attached to a render pass
         if m.kind[h] == "K_PIPELINE":
             for i in range(m.n):
-                if m.cb_pipe[i] == h:
+                if m.cb_pipe[i] == h or m.cb_cpipe[i] == h:
                     return E_KIND   # still bound to a command buffer
         m.kind[h] = "K_NONE"; m.phase[h] = "P_DEAD"
         m.buf_len[h] = 0; m.err[h] = 0
         m.attach[h] = -1; m.pipe_valid[h] = 0; m.signaled[h] = 0
-        m.cb_pipe[h] = -1
+        m.cb_pipe[h] = -1; m.cb_cpipe[h] = -1
         return OK
 
     # ---- render-pipeline extension --------------------------------------
@@ -404,6 +410,71 @@ def step_concrete(m: ModelState, op: str, h: int, off: int, ln: int,
             return E_PHASE          # waiting on an unsignaled fence
         return OK
 
+
+    # ---- compute extension (session 8) ----------------------------------
+    if op == "OP_CPIPE_NEW":
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_LIBRARY":
+            return E_KIND           # compute pipelines are built from a lib
+        m.kind[h] = "K_CPIPE"
+        m.pipe_valid[h] = 2         # has a compute entry point
+        return OK
+
+    if op == "OP_SMP_NEW":
+        # h=slot, off=coord mode (0=normalized, 1=clamped, else E_KIND)
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_DEVICE":
+            return E_KIND
+        if off not in (0, 1):
+            return E_KIND           # coord mode must be a legal enum
+        m.kind[h] = "K_SMP"
+        return OK
+
+    if op == "OP_ENC_COMPUTE":
+        # begin a compute pass on a command buffer
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_CMDBUF":
+            return E_KIND
+        if m.phase[h] != "P_ACTIVE":
+            return E_PHASE
+        return OK
+
+    if op == "OP_ENC_SETCPIPE":
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_CMDBUF":
+            return E_KIND
+        if m.phase[h] != "P_ACTIVE":
+            return E_PHASE
+        p = off % m.n if off >= 0 else off   # cpipe slot
+        if p < 0 or p >= m.n:
+            return E_DEAD
+        if m.kind[p] == "K_NONE":
+            return E_DEAD           # dead target handle (ABI parity)
+        if m.kind[p] != "K_CPIPE" or m.pipe_valid[p] != 2:
+            return E_KIND
+        m.cb_cpipe[h] = p
+        return OK
+
+    if op == "OP_ENC_DISPATCH":
+        # h=cmdbuf, x/y/w = threadgroup grid dims
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_CMDBUF":
+            return E_KIND
+        if m.phase[h] != "P_ACTIVE":
+            return E_PHASE
+        p = m.cb_cpipe[h]
+        if p < 0 or p >= m.n or m.kind[p] != "K_CPIPE" \
+                or m.pipe_valid[p] != 2:
+            return E_KIND           # dispatch requires a live cpipe
+        if x <= 0 or y <= 0 or w <= 0:
+            return E_BOUNDS         # Metal rejects empty grids
+        return OK
+
     return OK  # OP_NOP
 
 
@@ -419,11 +490,13 @@ def symbolic_step(z, s, op, h, off, ln, x, y, w, ht, lvl, next_s):
                                          s["tex_h"], s["tex_levels"])
     attach, pipe_valid, signaled, cb_pipe = (s["attach"],
         s["pipe_valid"], s["signaled"], s["cb_pipe"])
+    cb_cpipe = s["cb_cpipe"]
     nk, nph, nerr = next_s["kind"], next_s["phase"], next_s["err"]
     nbl, ntw, nth, ntl = (next_s["buf_len"], next_s["tex_w"],
                           next_s["tex_h"], next_s["tex_levels"])
     nat, npv, nsg, ncp = (next_s["attach"], next_s["pipe_valid"],
                           next_s["signaled"], next_s["cb_pipe"])
+    ncc = next_s["cb_cpipe"]
 
     live = kind[h] != z["K_NONE"]
     c = []
@@ -432,7 +505,8 @@ def symbolic_step(z, s, op, h, off, ln, x, y, w, ht, lvl, next_s):
     for (a, b) in [(kind, nk), (phase, nph), (err, nerr),
                    (buf_len, nbl), (tex_w, ntw), (tex_h, nth),
                    (tex_levels, ntl), (attach, nat), (pipe_valid, npv),
-                   (signaled, nsg), (cb_pipe, ncp)]:
+                   (signaled, nsg), (cb_pipe, ncp),
+                   (cb_cpipe, ncc)]:
         for i in range(z["N"]):
             c.append(a[i] == b[i])
 
@@ -471,13 +545,15 @@ def symbolic_step(z, s, op, h, off, ln, x, y, w, ht, lvl, next_s):
             if i != h:
                 refs.append(attach[i] == h)
                 refs.append(cb_pipe[i] == h)
+                refs.append(cb_cpipe[i] == h)
         no_refs = z3.Not(z3.Or(refs)) if refs else z3.BoolVal(True)
         c.append(z3.Implies(live & no_refs,
                             z3.And(nk[h] == z["K_NONE"],
                                    nph[h] == z["P_DEAD"],
                                    nbl[h] == 0, nerr[h] == 0,
                                    nat[h] == -1, npv[h] == 0,
-                                   nsg[h] == 0, ncp[h] == -1)))
+                                   nsg[h] == 0, ncp[h] == -1,
+                                   ncc[h] == -1)))
     elif op == "OP_RPASS_NEW":
         c.append(z3.Implies(live & (kind[h] == z["K_DEVICE"]),
                             z3.And(nk[h] == z["K_RPASS"],
@@ -503,6 +579,22 @@ def symbolic_step(z, s, op, h, off, ln, x, y, w, ht, lvl, next_s):
                             (kind_at(z, s, p) == z["K_PIPELINE"]) &
                             (kind_at_valid(z, s, p) == 1),
                             ncp[h] == p))
+    elif op == "OP_CPIPE_NEW":
+        c.append(z3.Implies(live & (kind[h] == z["K_LIBRARY"]),
+                            z3.And(nk[h] == z["K_CPIPE"],
+                                   npv[h] == 2)))
+    elif op == "OP_SMP_NEW":
+        c.append(z3.Implies(live & (kind[h] == z["K_DEVICE"]),
+                            nk[h] == z["K_SMP"]))
+    elif op == "OP_ENC_SETCPIPE":
+        p = z3.If(off >= 0, off % z["N"], off)
+        in_range = z3.And(p >= 0, p < z["N"])
+        c.append(z3.Implies(live & (kind[h] == z["K_CMDBUF"]) &
+                            (phase[h] == z["P_ACTIVE"]) &
+                            in_range &
+                            (kind_at(z, s, p) == z["K_CPIPE"]) &
+                            (kind_at_valid(z, s, p) == 2),
+                            ncc[h] == p))
     elif op == "OP_FENCE_NEW":
         c.append(z3.Implies(live & (kind[h] == z["K_DEVICE"]),
                             z3.And(nk[h] == z["K_FENCE"],
@@ -561,6 +653,14 @@ def invariants(z, s):
                                    s["cb_pipe"][i] >= 0),
                              kind_at(z, s, s["cb_pipe"][i])
                              == z["K_PIPELINE"]))
+        # I4b: compute pipeline implies a compute entry point
+        iv.append(z3.Implies(s["kind"][i] == z["K_CPIPE"],
+                             s["pipe_valid"][i] == 2))
+        # I8: a cmdbuf's bound compute pipeline never dangles
+        iv.append(z3.Implies(z3.And(s["kind"][i] == z["K_CMDBUF"],
+                                   s["cb_cpipe"][i] >= 0),
+                             kind_at(z, s, s["cb_cpipe"][i])
+                             == z["K_CPIPE"]))
         # I7: fence signal is boolean
         iv.append(z3.Implies(s["kind"][i] == z["K_FENCE"],
                              z3.Or(s["signaled"][i] == 0,
@@ -569,6 +669,8 @@ def invariants(z, s):
         iv.append(z3.Implies(s["attach"][i] >= 0,
                              s["kind"][i] == z["K_RPASS"]))
         iv.append(z3.Implies(s["cb_pipe"][i] >= 0,
+                             s["kind"][i] == z["K_CMDBUF"]))
+        iv.append(z3.Implies(s["cb_cpipe"][i] >= 0,
                              s["kind"][i] == z["K_CMDBUF"]))
     return z3.And(iv)
 
@@ -581,7 +683,7 @@ def run_proofs():
     z["phase_c"], z["kind_c"] = phase_c, kind_c
     (z["K_NONE"], z["K_DEVICE"], z["K_QUEUE"], z["K_CMDBUF"],
      z["K_BUFFER"], z["K_TEXTURE"], z["K_LIBRARY"], z["K_RPASS"],
-     z["K_PIPELINE"], z["K_FENCE"]) = tuple(kind_c)
+     z["K_PIPELINE"], z["K_FENCE"], z["K_CPIPE"], z["K_SMP"]) = tuple(kind_c)
     (z["P_DEAD"], _, z["P_ACTIVE"], z["P_COMMITTED"], z["P_SCHEDULED"],
      z["P_COMPLETED"], z["P_ERRORED"]) = tuple(phase_c)
     z["N"] = 3  # handle universe size for the symbolic model
@@ -598,7 +700,8 @@ def run_proofs():
              "attach": [z3.Int(f"at_{tag}_{i}") for i in range(z["N"])],
              "pipe_valid": [z3.Int(f"pv_{tag}_{i}") for i in range(z["N"])],
              "signaled": [z3.Int(f"sg_{tag}_{i}") for i in range(z["N"])],
-             "cb_pipe": [z3.Int(f"cp_{tag}_{i}") for i in range(z["N"])]}
+             "cb_pipe": [z3.Int(f"cp_{tag}_{i}") for i in range(z["N"])],
+             "cb_cpipe": [z3.Int(f"cc_{tag}_{i}") for i in range(z["N"])]}
         return s
 
     # ---- P0: inductive invariance of the consistency invariant ----
@@ -612,7 +715,9 @@ def run_proofs():
                  "OP_RPASS_NEW", "OP_RPASS_ATTACH", "OP_ENC_RPASS",
                  "OP_PIPELINE_NEW", "OP_ENC_SETPIPE", "OP_ENC_DRAW",
                  "OP_ENC_BLIT", "OP_TEX_READ", "OP_FENCE_NEW",
-                 "OP_FENCE_SIGNAL", "OP_FENCE_WAIT"]
+                 "OP_FENCE_SIGNAL", "OP_FENCE_WAIT",
+                 "OP_CPIPE_NEW", "OP_ENC_COMPUTE", "OP_ENC_SETCPIPE",
+                 "OP_ENC_DISPATCH", "OP_SMP_NEW"]
     for op in PROVE_OPS:
         for h in range(z["N"]):
             solver.push()
@@ -639,7 +744,9 @@ def run_proofs():
                 "OP_RPASS_NEW", "OP_RPASS_ATTACH", "OP_ENC_RPASS",
                 "OP_PIPELINE_NEW", "OP_ENC_SETPIPE", "OP_ENC_DRAW",
                 "OP_ENC_BLIT", "OP_TEX_READ",
-                "OP_FENCE_NEW", "OP_FENCE_SIGNAL", "OP_FENCE_WAIT"]
+                "OP_FENCE_NEW", "OP_FENCE_SIGNAL", "OP_FENCE_WAIT",
+                "OP_CPIPE_NEW", "OP_ENC_COMPUTE", "OP_ENC_SETCPIPE",
+                "OP_ENC_DISPATCH", "OP_SMP_NEW"]
     # slot preference: 70% pick a slot where the op is APPLICABLE
     # (builds real DEV->QUEUE->CB->COMMIT->TICK chains), 30% adversarial
     # random slots (drives the dead/kind rejection paths). Op order and
@@ -670,15 +777,20 @@ def run_proofs():
         "OP_FENCE_NEW": {"K_DEVICE"},
         "OP_FENCE_SIGNAL": {"K_FENCE"},
         "OP_FENCE_WAIT": {"K_FENCE"},
+        "OP_CPIPE_NEW": {"K_LIBRARY"},
+        "OP_ENC_COMPUTE": {"K_CMDBUF"},
+        "OP_ENC_SETCPIPE": {"K_CMDBUF"},
+        "OP_ENC_DISPATCH": {"K_CMDBUF"},
+        "OP_SMP_NEW": {"K_DEVICE"},
     }
 
     def progressive_op(m, rng):
         """Pick the op that ADVANCES the most-developed slot through its
         lifecycle; used with prob ~0.55 so half the steps stay random/
         adversarial (rejection paths still well covered)."""
-        RANK = ["K_NONE", "K_LIBRARY", "K_PIPELINE", "K_TEXTURE",
-                "K_FENCE", "K_RPASS", "K_BUFFER", "K_QUEUE",
-                "K_CMDBUF", "K_DEVICE"]
+        RANK = ["K_NONE", "K_LIBRARY", "K_PIPELINE", "K_CPIPE",
+                "K_SMP", "K_TEXTURE", "K_FENCE", "K_RPASS", "K_BUFFER",
+                "K_QUEUE", "K_CMDBUF", "K_DEVICE"]
         best, best_rank = None, -1
         for i in range(4):
             r = RANK.index(m.kind[i]) if m.kind[i] in RANK else 0
@@ -689,7 +801,8 @@ def run_proofs():
         k = m.kind[best]
         if k == "K_DEVICE":
             return rng.choice(["OP_QUEUE_NEW", "OP_BUF_NEW", "OP_TEX_NEW",
-                               "OP_LIB_NEW", "OP_RPASS_NEW", "OP_FENCE_NEW"]), best
+                               "OP_LIB_NEW", "OP_RPASS_NEW", "OP_FENCE_NEW",
+                               "OP_SMP_NEW"]), best
         if k == "K_QUEUE":
             return "OP_CB_NEW", best
         if k == "K_CMDBUF":
@@ -704,6 +817,11 @@ def run_proofs():
                     enc.append("OP_ENC_SETPIPE")
                     if m.cb_pipe[best] >= 0:
                         enc += ["OP_ENC_DRAW", "OP_ENC_DRAW"]
+                enc.append("OP_ENC_COMPUTE")
+                if any(m.kind[i] == "K_CPIPE" for i in range(4)):
+                    enc.append("OP_ENC_SETCPIPE")
+                    if m.cb_cpipe[best] >= 0:
+                        enc += ["OP_ENC_DISPATCH", "OP_ENC_DISPATCH"]
                 if sum(1 for i in range(4)
                        if m.kind[i] == "K_BUFFER") >= 2:
                     enc.append("OP_ENC_BLIT")
@@ -717,7 +835,7 @@ def run_proofs():
         if k == "K_TEXTURE":
             return rng.choice(["OP_TEX_WRITE", "OP_TEX_READ"]), best
         if k == "K_LIBRARY":
-            return "OP_PIPELINE_NEW", best
+            return rng.choice(["OP_PIPELINE_NEW", "OP_CPIPE_NEW"]), best
         if k == "K_RPASS":
             texs = [i for i in range(4) if m.kind[i] == "K_TEXTURE"]
             if texs:
@@ -766,6 +884,16 @@ def run_proofs():
                 pls = [i for i in range(4) if m.kind[i] == "K_PIPELINE"]
                 if pls:
                     args["off"] = rng.choice(pls)
+            elif op == "OP_ENC_SETCPIPE":
+                cps = [i for i in range(4) if m.kind[i] == "K_CPIPE"]
+                if cps:
+                    args["off"] = rng.choice(cps)
+            elif op == "OP_ENC_DISPATCH":
+                args["x"] = rng.choice([1, 4, 64])   # tgX > 0
+                args["y"] = rng.choice([1, 2, 8])    # tgY > 0
+                args["w"] = rng.choice([1, 2])       # tgZ > 0
+            elif op == "OP_SMP_NEW":
+                args["off"] = rng.choice([0, 1, 2])  # coord modes
             elif op == "OP_ENC_DRAW":
                 args["x"] = rng.choice([1, 3, 64, 1000])  # vc > 0
                 args["y"] = rng.choice([1, 2, 4])          # ic >= 1
@@ -782,11 +910,24 @@ def run_proofs():
             # P1: encode accepted => phase was ACTIVE at the call
             if op == "OP_ENCODE" and rc == 0 and phase_before != "P_ACTIVE":
                 n_viol += 1
-            # P1b: render-pass/draw/blit encodes accepted => ACTIVE
+            # P1b: render-pass/draw/blit/compute encodes => ACTIVE
             if op in ("OP_ENC_RPASS", "OP_ENC_SETPIPE", "OP_ENC_DRAW",
-                      "OP_ENC_BLIT") and rc == 0 \
-                    and phase_before != "P_ACTIVE":
+                      "OP_ENC_BLIT", "OP_ENC_COMPUTE", "OP_ENC_SETCPIPE") \
+                    and rc == 0 and phase_before != "P_ACTIVE":
                 n_viol += 1
+            # P3d: dispatch accepted => grid dims all > 0
+            if op == "OP_ENC_DISPATCH" and rc == 0 and \
+                    not (args["x"] > 0 and args["y"] > 0
+                         and args["w"] > 0):
+                n_viol += 1
+            # P8: dispatch accepted => the bound cpipe was live+valid
+            # (cb_cpipe and the target's kind are untouched by dispatch,
+            #  so post-state == call-time state for these fields)
+            if op == "OP_ENC_DISPATCH" and rc == 0:
+                pb = m.cb_cpipe[h]
+                if pb < 0 or pb >= 4 or m.kind[pb] != "K_CPIPE" \
+                        or m.pipe_valid[pb] != 2:
+                    n_viol += 1
             # P3: buf write accepted => bounds hold
             if op == "OP_BUF_WRITE" and rc == 0 and \
                     not (0 <= args["off"] and args["off"] + args["ln"] <= m.buf_len[h]):
@@ -814,7 +955,7 @@ def run_proofs():
                 n_viol += 1
             trace.append((op, h, args, rc))
         traces.append(trace)
-    print(f"[P1/P3/P4] randomized safety over 20000 traces "
+    print(f"[P1/P3/P4/P8] randomized safety over 20000 traces "
           f"({sum(len(t) for t in traces)} steps): "
           f"{'PROVED (0 violations)' if n_viol == 0 else 'FAILED: %d' % n_viol}")
     assert n_viol == 0
