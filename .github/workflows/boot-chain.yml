@@ -7,6 +7,11 @@ on:
         required: false
         default: false
         type: boolean
+      phys_pak:
+        description: 'Physical pak model (FN35_NO_ENGINE_PAK=1 — bypass the fragile engine pak layer)'
+        required: false
+        default: false
+        type: boolean
   workflow_call: {}
 
 permissions:
@@ -99,6 +104,7 @@ jobs:
         run: |
           chmod +x /home/z/my-project/scripts/gha_chain.sh
           export CHAIN_DEADLINE_EPOCH=$(( $(date +%s) + 19500 ))   # ~5h25m of grinding
+          if [ "${{ inputs.phys_pak }}" = "true" ]; then export FN35_NO_ENGINE_PAK=1; fi
           bash /home/z/my-project/scripts/gha_chain.sh | tee /tmp/chain_stop.txt
           echo "CHAIN_STOP=$(grep STOP_REASON= /tmp/chain_stop.txt | tail -1 | cut -d= -f2)" >> $GITHUB_ENV
           tail -40 /home/z/my-project/fn35/chain_console.log
@@ -121,6 +127,8 @@ jobs:
             fn35/snap_good
             fn35/snap_crash
             fn35/.chain_crashes
+            fn35/.chain_crashpc
+            fn35/.phys_mode
             fn35/chain_console.log
             fn35/*.log
           retention-days: 7
