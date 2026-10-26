@@ -499,3 +499,56 @@ Stage Summary:
   LogInit expected on runner in ~2.5-3h (1:1 wall clock)
 - Next: keep one_seg rhythm; convert fn35-pakfs to safe Rust with the
   same oracle differential; watch for LogInit/open-proj in console
+
+---
+Task ID: session-7 (continued, 2026-10-26 06:00Z-07:15Z)
+Agent: main (Z.ai)
+
+Work Log:
+- DSR BRANCH-REPAIR STOMP BUG: the null-call GOT-desync repair sets
+  t.pc to the decoded slot target, then the shared resume logic
+  overwrote it with fault_pc+4 (pc 0x0 -> 0x4 -> 0x8 exec crashes).
+  Fixed: pc+4 resume only for load/store kinds. Commit c5f444b+1.
+- CRASH POLICY: exec fetch faults are poison (thread state garbage);
+  loader now REFUSES to save snap_crash for them -> chain rolls back
+  to snap_good instead of the 0x4->0x8->0xc infinite walk. snap.py
+  poison-skip restricted to real-code data faults.
+- RUST fn35-pakfs crate (#![forbid(unsafe_code)], aes + miniz_oxide):
+  full v4 pak reader with the same suffix/case-insensitive guest-path
+  resolver. Differential caught TWO REAL PAKFS BUGS in the Python
+  original: (1) encrypted compressed blocks were truncated DOWN to
+  16-multiples instead of reading the padded on-disk span - 31/56
+  sampled entries (BaseEngine.ini, DefaultEngine.ini, ...) lost tail
+  bytes; (2) unencrypted uncompressed entries leaked the 16-byte
+  padding tail. Both fixed; oracle regenerated; 56/56 byte-exact now.
+  These truncations would have bitten the engine at config-parse time
+  right after the uproject gate.
+- Z3 METAL RENDER-PIPELINE EXTENSION (commit 1acb7d8): +10 ops
+  (RPASS_NEW/ATTACH, ENC_RPASS, PIPELINE_NEW, ENC_SETPIPE, ENC_DRAW,
+  ENC_BLIT, TEX_READ, FENCE_NEW/SIGNAL/WAIT), +3 kinds, +4 state
+  fields; invariants I4-I7 proved inductive (P0 unsat x54); 20000-trace
+  BMC green with new properties P1b/P3b/P3c/P6. Full stack (python
+  ctypes -> C ABI -> safe Rust) 300 traces / 2558 steps / 0 mismatches.
+  Differential caught: enc_blit E_DEAD/E_KIND priority ordering and an
+  FFI mutex double-lock DEADLOCK (guard alive during fin()).
+- PRINTF %f BUG: next_dbl returns a double; the `& mask` int leftover
+  raised TypeError on every float conversion ("Took <fmt-err...>").
+  Fixed.
+- GRIND PROGRESS: fresh boot reached LogInit -> uproject FOUND (pakfs
+  fix works!) -> configs loaded from pak -> LogHAL platform memory ->
+  Device Profile CVars processing (r.Scalability.*) -> LogStreaming
+  "Took ..." timing lines -> one abort() after an ObjC msgSend chain
+  (recovered; no loop) -> quiet compute phase. Snapshot 142-146MB.
+- Runner 40275193051 grinding since 05:37Z with ALL fixes (pakfs +
+  DSR + crash policy); state artifact will show its milestones at
+  window end ~10:45Z.
+
+Stage Summary:
+- The LogInit uproject wall is definitively passed; engine is in
+  device-profile/streaming startup territory
+- Rust conversion: 4 crates now (metal, metal-ffi, macho, pakfs), all
+  differential-green vs their Python oracles
+- Z3 Metal: render-capable op surface (pass/pipeline/draw/blit/fence),
+  machine-checked
+- Next: keep grinding to LogSlate/LogRHI; watch runner artifact;
+  convert next Python module (fn35_clib printf family is a candidate)
