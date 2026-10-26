@@ -160,6 +160,9 @@ def save_snapshot(l, snapdir, note=""):
     # dsr repair state: the restore re-arms hooks itself
     for _fl in ("_sync_cb", "_block_cb", "_dsr_pending"):
         state.pop(_fl, None)
+    # the Metal ctypes bridge (CDLL objects cannot be pickled; the
+    # restore recreates it lazily via _bridge())
+    state.pop("_metal_bridge", None)
     for k in _DROP:
         state[k] = None
     state["fds"] = _ser_fds(l)

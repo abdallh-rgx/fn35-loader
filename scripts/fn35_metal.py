@@ -415,20 +415,13 @@ def install_ghost_classes(loader):
     so the GL chain is never destabilized."""
     import fn35_objc
     T = fn35_objc.GHOST_CLASS_TABLE
-    fn35_objc.GHOST_SIZES.setdefault("MTLDevice", 96)
-    fn35_objc.GHOST_SIZES.setdefault("MTLCommandQueue", 64)
-    fn35_objc.GHOST_SIZES.setdefault("MTLCommandBuffer", 96)
-    fn35_objc.GHOST_SIZES.setdefault("MTLBuffer", 64)
-    fn35_objc.GHOST_SIZES.setdefault("MTLTexture", 96)
-    fn35_objc.GHOST_SIZES.setdefault("MTLLibrary", 64)
-    fn35_objc.GHOST_SIZES.setdefault("MTLFunction", 64)
-    fn35_objc.GHOST_SUPER.setdefault("MTLDevice", "NSObject")
-    fn35_objc.GHOST_SUPER.setdefault("MTLCommandQueue", "NSObject")
-    fn35_objc.GHOST_SUPER.setdefault("MTLCommandBuffer", "NSObject")
-    fn35_objc.GHOST_SUPER.setdefault("MTLBuffer", "NSObject")
-    fn35_objc.GHOST_SUPER.setdefault("MTLTexture", "NSObject")
-    fn35_objc.GHOST_SUPER.setdefault("MTLLibrary", "NSObject")
-    fn35_objc.GHOST_SUPER.setdefault("MTLFunction", "NSObject")
+    for cls, sz in (("MTLDevice", 96), ("MTLCommandQueue", 64),
+                    ("MTLCommandBuffer", 96), ("MTLBuffer", 64),
+                    ("MTLTexture", 96), ("MTLLibrary", 64),
+                    ("MTLFunction", 64)):
+        fn35_objc.GHOST_SIZES.setdefault(cls, sz)
+        fn35_objc.GHOST_HIERARCHY.setdefault(cls, "NSObject")
+        fn35_objc.GHOST_ALLOWED.add(cls)
 
     # ----- MTLDevice -----------------------------------------------------
     def dev_new_queue(l, recv, args):
