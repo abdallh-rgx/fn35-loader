@@ -1035,6 +1035,18 @@ class FNLoader:
         # the function rets immediately; kept for cold-start safety).
         (0x10235772c, b"\x34\x00\x00\x14",
          "verify-loop missing-detect -> always fine (b 0x1023577fc)"),
+        # The app-level "requires Metal" gate: reads
+        # [/Script/IOSRuntimeSettings.IOSRuntimeSettings]
+        # bSupportsOpenGLES2 (UTF-16 strings, xref'd from the 'App
+        # requires Metal but it doesn't exist' cfstring at 0x1040a1390);
+        # the shipped cook says False (Metal-only build) -> value 0 ->
+        # cbz to the die routine (NSLog + ShowAlert + abort at
+        # 0x1009c5f08..0x1009c5f94). Our -es2 command line forces the
+        # GL RHI regardless, so the gate is pointless here. NOP the
+        # cbz: the engine proceeds to RHIInit (the abort-recovery path
+        # also escapes it, but costs the NSLog storm + crash roulette).
+        (0x1009c5da0, b"\x1f\x20\x03\xd5",
+         "Metal-required gate -> nop (bSupportsOpenGLES2 read ignored)"),
     ]
 
     def apply_code_patches(self):
