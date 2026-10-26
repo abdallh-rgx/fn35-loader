@@ -53,6 +53,8 @@ fn kind_of(s: &str) -> u32 {
         "K_RPASS" => Kind::Rpass.as_u32(),
         "K_PIPELINE" => Kind::Pipeline.as_u32(),
         "K_FENCE" => Kind::Fence.as_u32(),
+        "K_CPIPE" => Kind::Cpipe.as_u32(),
+        "K_SMP" => Kind::Smp.as_u32(),
         _ => panic!("unknown kind {s}"),
     }
 }
@@ -210,6 +212,25 @@ fn z3_oracle_conformance() {
                 },
                 "OP_FENCE_SIGNAL" => got = m.fence_signal(h),
                 "OP_FENCE_WAIT" => got = m.fence_wait(h),
+                "OP_CPIPE_NEW" => match m.cpipe_new(h) {
+                    (nh, 0) if nh != 0 => slots[step.h] = nh,
+                    (_, rc) => got = rc,
+                },
+                "OP_SMP_NEW" => match m.smp_new(h, a.off as u32) {
+                    (nh, 0) if nh != 0 => slots[step.h] = nh,
+                    (_, rc) => got = rc,
+                },
+                "OP_ENC_COMPUTE" => got = m.enc_compute(h),
+                "OP_ENC_SETCPIPE" => {
+                    let p = if a.off >= 0 { (a.off % 4) as usize } else {
+                        usize::MAX };
+                    let ph = if p < 4 { slots[p] } else { 0 };
+                    got = m.enc_setcpipe(h, ph)
+                }
+                "OP_ENC_DISPATCH" => {
+                    got = m.enc_dispatch(h, u64v(a.x), u64v(a.y),
+                                         u64v(a.w))
+                }
                 "OP_LIB_NEW" => match m.lib_new(h, &mm) {
                     (nh, 0) if nh != 0 => slots[step.h] = nh,
                     (_, rc) => got = rc,

@@ -444,6 +444,59 @@ pub extern "C" fn fn35_metal_enc_blit(cb: u64, src: u64, dst: u64,
         .unwrap_or(1))
 }
 
+// -----------------------------------------------------------------------
+// Compute extension (Z3 spec session 8)
+// -----------------------------------------------------------------------
+#[no_mangle]
+pub extern "C" fn fn35_metal_cpipe_new(lib: u64) -> u64 {
+    match state().lock() {
+        Ok(mut g) => {
+            let (h, rc) = g.cpipe_new(lib);
+            if rc != OK {
+                g.set_last_error(rc);
+            }
+            h
+        }
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_smp_new(dev: u64, coord_mode: u32) -> u64 {
+    match state().lock() {
+        Ok(mut g) => {
+            let (h, rc) = g.smp_new(dev, coord_mode);
+            if rc != OK {
+                g.set_last_error(rc);
+            }
+            h
+        }
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_enc_compute(cb: u64) -> u32 {
+    fin(state().lock()
+        .map(|mut g| g.enc_compute(cb))
+        .unwrap_or(1))
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_enc_setcpipe(cb: u64, cpipe: u64) -> u32 {
+    fin(state().lock()
+        .map(|mut g| g.enc_setcpipe(cb, cpipe))
+        .unwrap_or(1))
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_enc_dispatch(cb: u64, tgx: u64, tgy: u64,
+                                          tgz: u64) -> u32 {
+    fin(state().lock()
+        .map(|mut g| g.enc_dispatch(cb, tgx, tgy, tgz))
+        .unwrap_or(1))
+}
+
 #[no_mangle]
 pub extern "C" fn fn35_metal_fence_new(dev: u64) -> u64 {
     match state().lock() {
