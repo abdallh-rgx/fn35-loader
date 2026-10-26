@@ -1,0 +1,12 @@
+[package]
+name = "fn35-printf"
+version = "0.1.0"
+edition = "2021"
+description = "printf-family format engine for the fn35 loader (arm64 varargs) - 100% safe Rust"
+license = "MIT"
+
+[dependencies]
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
