@@ -218,7 +218,12 @@ def fmt_engine(fmt, src):
                     s = s[:prec]
                 emit(pad(s, width))
             elif conv in "fFeEgG":
-                d = F64.unpack(U64.pack(src.next_dbl() & 0xFFFFFFFFFFFFFFFF))[0]
+                # next_dbl() returns the DOUBLE VALUE (reg_d), not bits -
+                # the old `& mask` was an int-path leftover and raised
+                # TypeError("unsupported operand") on every %f
+                d = src.next_dbl()
+                if not isinstance(d, float):
+                    d = F64.unpack(U64.pack(int(d) & 0xFFFFFFFFFFFFFFFF))[0]
                 if prec is None:
                     prec = 6
                 s = "%.*f" % (prec, d) if conv in "fF" else \
