@@ -674,3 +674,40 @@ Stage Summary:
 - The phys-model local chain is the deepest universe now
 - Valve fresh-window fix = the difference between a crashing timeout
   path and a healthy signaled wait
+
+---
+Task ID: session-8 (continued, 23:15Z)
+
+Work Log:
+- METAL GATE DECODED + NOPPED: the abort() class at 0x1009c5f94 was
+  the app-level "requires Metal" gate - it reads
+  [/Script/IOSRuntimeSettings.IOSRuntimeSettings] bSupportsOpenGLES2
+  (UTF-16 config strings xref'd from the 'App requires Metal but it
+  doesn't exist' cfstring); the shipped cook says False (Metal-only) ->
+  cbz w8 -> die routine (NSLog + ShowAlert + abort). Patched the cbz
+  at 0x1009c5da0 -> NOP (the -es2 cmdline forces GL anyway; the
+  abort-recovery escaped it but cost the storm + crash roulette)
+- NSLog now prints REAL content (was hidden): __DATA_CONST.__cfstring
+  decode + %@ arg substitution. Revealed: the Metal message, 'Error
+  excluding 1 from backup None', 'Created a UIView that will support
+  <EAGLContext>'
+- the phys chain escaped the abort via recovery (designed path: "one
+  abort() recovered; no loop") and is grinding the remap table:
+  MainAppThread 6.4B -> 9.8B+ (the 0x90-stride child -> 0x80-stride
+  rows loop at 0x1009c5f94+, the function ENTRY is the slice-boundary
+  pc because it is re-called per entry)
+- milestones passed on the phys chain (deepest ever): plugins
+  configured -> logs deleted -> Async Loading initialized (Event
+  Driven Loader true) -> InitEngineTextLocalization 288s
+- runner window-1 (default mode fresh boot, old code) grinding toward
+  its 23:09Z deadline; window-2 will pick up all fixes via main
+- pace: ~260-525M instr/segment on MainAppThread; the old universe
+  ground 6.6G->11.4G+ here before env death, so completion is
+  plausibly ~11-15B (RegisterNativeRedirects -> then the weak-guard
+  caves protect the old IndexToObject crash site)
+
+Stage Summary:
+- phys chain: 9.8B MainAppThread, healthy, zero crashes since the
+  valve fix; the abort-recovery + Metal-NOP make this phase robust
+- all fixes pushed: valve fresh-window, NSLog content, Metal-NOP,
+  phys_pak dispatch input, forensics envs on the runner chain
