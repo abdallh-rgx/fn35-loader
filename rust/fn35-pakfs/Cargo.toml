@@ -1,0 +1,14 @@
+[package]
+name = "fn35-pakfs"
+version = "0.1.0"
+edition = "2021"
+description = "UE4 pak v4 (AES-256 + zlib) reader for the Fortnite 3.5 loader - 100% safe Rust"
+license = "MIT"
+
+[dependencies]
+aes = "0.8"
+miniz_oxide = "0.8"
+
+[dev-dependencies]
+serde_json = "1"
+sha2 = "0.10"

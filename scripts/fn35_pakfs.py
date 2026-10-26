@@ -172,14 +172,29 @@ class PakFS:
             self.f.seek(e["off"] + e["hdr"])
             raw = self.f.read((e["size"] + 15) & ~15)
             if e["enc"]:
-                raw = self._aes().decrypt(raw)[:e["size"]]
-            return raw
+                raw = self._aes().decrypt(raw)
+            # on-disk span is padded to 16; the entry owns exactly
+            # e["size"] bytes (unencrypted entries used to leak the
+            # padding tail - caught by the Rust differential)
+            return raw[:e["size"]]
         out = []
         for (s, en) in e["blocks"]:
             self.f.seek(s)
-            chunk = self.f.read(en - s)
+            # UE4 pak v4 encrypted blocks are PADDED to a 16-multiple on
+            # disk (same as the uncompressed path); read the padded span,
+            # decrypt, then keep exactly (en - s) bytes. Reading only
+            # (en - s) and truncating DOWN to a 16-multiple silently
+            # dropped the last up-to-15 bytes of every encrypted block
+            # (31 of 56 sampled entries were truncated - caught by the
+            # Rust differential).
+            want = en - s
+            padded = (want + 15) & ~15
+            chunk = self.f.read(padded)
             if e["enc"]:
-                chunk = self._aes().decrypt(chunk[:len(chunk) // 16 * 16])[:en - s]
+                chunk = self._aes().decrypt(
+                    chunk[:len(chunk) // 16 * 16])[:want]
+            else:
+                chunk = chunk[:want]
             out.append(zlib.decompressobj().decompress(chunk))
         return b"".join(out)
 
