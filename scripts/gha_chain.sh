@@ -42,7 +42,7 @@ for ((i=1; i<=SEGMAX; i++)); do
   timeout 560 python3 -u fn35_loader.py > "$LOG" 2>&1
   RC=$?
   LAST=$(grep -E "stopped:" "$LOG" | tail -1)
-  MILES=$(grep -aoE "didFinishLaunching|LogInit:|LogPakFile|LogRHI|LogSlate|portrait mode|LogEOS" "$LOG" | sort -u | tr '\n' ',')
+  MILES=$(grep -aoE "didFinishLaunching|LogInit:|LogPakFile|LogRHI|LogSlate|LogStreaming|LogHAL|Device Profile|LogUObject|LogCore|LogEOS|portrait mode|first frame|abort\(\) called" "$LOG" | sort -u | tr '\n' ',')
   echo "[gha-chain] $i rc=$RC ${LAST:0:110} | $MILES" >> "$CONSOLE"
   # rendered frames = mission accomplished
   if ls /home/z/my-project/download/fn35/screenshots/*.png >/dev/null 2>&1; then

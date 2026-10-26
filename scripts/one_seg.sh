@@ -24,7 +24,7 @@ LOG=$F35/loc_$(date +%m%d_%H%M%S).log
 timeout 575 python3 -u fn35_loader.py > "$LOG" 2>&1
 RC=$?
 LAST=$(grep -E "stopped:" "$LOG" | tail -1)
-MILES=$(grep -aoE "didFinishLaunching|LogInit:|LogPakFile|LogRHI|LogSlate|portrait mode|LogEOS" "$LOG" | sort -u | tr '\n' ',')
+MILES=$(grep -aoE "didFinishLaunching|LogInit:|LogPakFile|LogRHI|LogSlate|LogStreaming|LogHAL|Device Profile|LogUObject|LogCore|LogEOS|portrait mode|first frame|abort\(\) called" "$LOG" | sort -u | tr '\n' ',')
 INITS=$(grep -aoE "init [0-9]+/773" "$LOG" | tail -1)
 echo "[local] rc=$RC ${LAST:0:110} | ${INITS} | $MILES" | tee -a "$CONSOLE"
 if ls /home/z/my-project/download/fn35/screenshots/*.png >/dev/null 2>&1; then
