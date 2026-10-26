@@ -2882,14 +2882,20 @@ class FNLoader:
                                 pass
                     else:
                         self.uc.mem_write(_dsr["addr"], _dsr["data"])
-                    t.pc = _dsr["pc"] + 4
-                    t.regs[a64.UC_ARM64_REG_PC] = _dsr["pc"] + 4
-                    try:
-                        self.uc.reg_write(a64.UC_ARM64_REG_PC, t.pc)
-                    except Exception:
-                        pass
-                    self.console("[dsr-applied] %s pc=0x%x -> 0x%x"
-                                 % (_dsr["kind"], _dsr["pc"], t.pc))
+                    # resume-after-instruction is only for load/store (the
+                    # faulted insn is completed by the repair). For a
+                    # "branch" repair the pc was JUST set to the decoded
+                    # GOT target - the old unconditional pc+4 here stomped
+                    # it (fault pc 0x0 -> resume 0x4 -> exec fetch crash).
+                    if _dsr["kind"] in ("load", "store"):
+                        t.pc = _dsr["pc"] + 4
+                        t.regs[a64.UC_ARM64_REG_PC] = t.pc
+                        try:
+                            self.uc.reg_write(a64.UC_ARM64_REG_PC, t.pc)
+                        except Exception:
+                            pass
+                    self.console("[dsr-applied] %s pc -> 0x%x"
+                                 % (_dsr["kind"], t.pc))
                 except Exception as e:
                     self.warn("dsr apply failed %r" % (e,))
             # deferred mmap data-fill (TCG-desync fix: large mem_writes
