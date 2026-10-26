@@ -386,8 +386,12 @@ class ObjCRuntime:
             if g.cls == "NSMutableString":
                 return g.fields.get("str", "")
             return None
-        # binary __cfstring constant?
-        for sec in l.macho.sections_in("__DATA", "__cfstring"):
+        # binary __cfstring constant? (arm64 iOS puts them in __DATA
+        # AND __DATA_CONST -- missing the latter made NSLog formats
+        # decode as None, hiding ObjC exception reasons)
+        for sec in (list(l.macho.sections_in("__DATA", "__cfstring"))
+                    + list(l.macho.sections_in("__DATA_CONST",
+                                               "__cfstring"))):
             if sec.addr <= ptr < sec.addr + sec.size:
                 data = l.rd64(ptr + 16)
                 ln = l.rd64(ptr + 24)
@@ -2302,6 +2306,22 @@ def _nslog(l, fmt, *va):
     s = l.objc.read_nsstring(fmt) if fmt else None
     if s is None:
         s = l.gcstr(fmt) if fmt else ""
+    # %@ with an NSString/CFString arg in x1: the reason strings of
+    # ObjC exceptions arrive this way -- decode them properly
+    if s and "%@" in s:
+        try:
+            a1 = l.reg_x(1)
+            sub = l.objc.read_nsstring(a1)
+            if sub is None and a1:
+                # maybe a plain C string
+                try:
+                    sub = l.gcstr(a1)
+                except Exception:
+                    sub = None
+            if sub:
+                s = s.replace("%@", sub[:1600])
+        except Exception:
+            pass
     src = RegSrc(l, first_named_x=2)
     try:
         out = _fmt_objc(l, s, src)
