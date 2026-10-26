@@ -106,6 +106,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "fn35-paths"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "fn35-printf"
 version = "0.1.0"
 dependencies = [

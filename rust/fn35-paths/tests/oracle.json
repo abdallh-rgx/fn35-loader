@@ -1,0 +1,94 @@
+[
+ {
+  "guest": null,
+  "host": null
+ },
+ {
+  "guest": "",
+  "host": null
+ },
+ {
+  "guest": "file:///var/mobile/foo.txt",
+  "host": "/home/z/my-project/fn35/sandbox/System/var/mobile/foo.txt"
+ },
+ {
+  "guest": "/private/var/containers/Bundle/Application/6B3F2A11-4C4E-4E22-9A04-7D9E1A55C0FF/FortniteClient.app/Info.plist",
+  "host": "/home/z/my-project/fn35/sandbox/Bundle/FortniteClient.app/Info.plist"
+ },
+ {
+  "guest": "/private/var/containers/Bundle/Application/6B3F2A11-4C4E-4E22-9A04-7D9E1A55C0FF/FortniteClient.app/cookeddata/fortnitegame/Content/Paks/pak.pak",
+  "host": "/home/z/my-project/fn35/sandbox/Bundle/FortniteClient.app/cookeddata/fortnitegame/Content/Paks/pak.pak"
+ },
+ {
+  "guest": "/var/containers/Bundle/Application/6B3F2A11-4C4E-4E22-9A04-7D9E1A55C0FF/FortniteClient.app/FortniteClient",
+  "host": "/home/z/my-project/fn35/sandbox/Bundle/FortniteClient.app/FortniteClient"
+ },
+ {
+  "guest": "/var/mobile/Containers/Data/Application/8A1D5E77-1234-4E56-9BC0-42DE2C1F9AB7/Documents/save.dat",
+  "host": "/home/z/my-project/fn35/sandbox/Data/Documents/save.dat"
+ },
+ {
+  "guest": "/var/mobile/Containers/Data/Application/8A1D5E77-1234-4E56-9BC0-42DE2C1F9AB7/Library/Preferences/x.plist",
+  "host": "/home/z/my-project/fn35/sandbox/Data/Library/Preferences/x.plist"
+ },
+ {
+  "guest": "/var/mobile/anything",
+  "host": "/home/z/my-project/fn35/sandbox/Data/anything"
+ },
+ {
+  "guest": "/var/tmp/cache.bin",
+  "host": "/home/z/my-project/fn35/sandbox/tmp/cache.bin"
+ },
+ {
+  "guest": "/tmp/x",
+  "host": "/home/z/my-project/fn35/sandbox/tmp/x"
+ },
+ {
+  "guest": "/private/tmp/y",
+  "host": "/home/z/my-project/fn35/sandbox/tmp/y"
+ },
+ {
+  "guest": "/var/db/z",
+  "host": "/home/z/my-project/fn35/sandbox/Data/db/z"
+ },
+ {
+  "guest": "/System/Library/Fonts/xx.ttc",
+  "host": "/home/z/my-project/fn35/sandbox/System/System/Library/Fonts/xx.ttc"
+ },
+ {
+  "guest": "/usr/lib/system/libsystem_c.dylib",
+  "host": "/home/z/my-project/fn35/sandbox/System/usr/lib/system/libsystem_c.dylib"
+ },
+ {
+  "guest": "/Developer/usr/bin/llvm",
+  "host": "/home/z/my-project/fn35/sandbox/System/Developer/usr/bin/llvm"
+ },
+ {
+  "guest": "/Library/Preferences/global.plist",
+  "host": "/home/z/my-project/fn35/sandbox/System/Library/Preferences/global.plist"
+ },
+ {
+  "guest": "/etc/hosts",
+  "host": "/home/z/my-project/fn35/sandbox/System/etc/hosts"
+ },
+ {
+  "guest": "/not/a/known/root",
+  "host": "/home/z/my-project/fn35/sandbox/System/not/a/known/root"
+ },
+ {
+  "guest": "relative/path.txt",
+  "host": "/home/z/my-project/fn35/sandbox/System/relative/path.txt"
+ },
+ {
+  "guest": "/private/var/containers/Bundle/Application/6B3F2A11-4C4E-4E22-9A04-7D9E1A55C0FF/FortniteClient.app//double//slash",
+  "host": "/home/z/my-project/fn35/sandbox/Bundle/FortniteClient.app/double/slash"
+ },
+ {
+  "guest": "//var//mobile//a",
+  "host": "/home/z/my-project/fn35/sandbox/Data/a"
+ },
+ {
+  "guest": "file:///private/var/containers/Bundle/Application/6B3F2A11-4C4E-4E22-9A04-7D9E1A55C0FF/FortniteClient.app/f",
+  "host": "/home/z/my-project/fn35/sandbox/System/private/var/containers/Bundle/Application/6B3F2A11-4C4E-4E22-9A04-7D9E1A55C0FF/FortniteClient.app/f"
+ }
+]

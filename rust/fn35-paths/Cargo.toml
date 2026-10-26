@@ -1,0 +1,12 @@
+[package]
+name = "fn35-paths"
+version = "0.1.0"
+edition = "2021"
+description = "Guest iOS path -> host sandbox translation for the fn35 loader - 100% safe Rust"
+license = "MIT"
+
+[dependencies]
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
