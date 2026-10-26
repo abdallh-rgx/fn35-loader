@@ -50,8 +50,17 @@ for ((i=1; i<=SEGMAX; i++)); do
     break
   fi
   if grep -q "FATAL" "$LOG"; then
-    C=$(cat "$CRASHES_FILE" 2>/dev/null || echo 0)
-    C=$((C+1)); echo $C > "$CRASHES_FILE"
+    # same-pc fingerprint: different pc = progress (reset), same pc = loop
+    NEWPC=$(grep -aoE "pc=0x[0-9a-f]+" "$LOG" | head -1)
+    OLDCPC=$(cat "$CRASHPC_FILE" 2>/dev/null)
+    if [ "$NEWPC" != "$OLDCPC" ] && [ -n "$NEWPC" ]; then
+      echo "$NEWPC" > "$CRASHPC_FILE"
+      C=1
+    else
+      C=$(cat "$CRASHES_FILE" 2>/dev/null || echo 0)
+      C=$((C+1))
+    fi
+    echo $C > "$CRASHES_FILE"
     if [ -f "$F35/snap_crash/index.json" ]; then
       if [ "$C" -ge 3 ]; then
         echo "[gha-chain] crash-loop x$C -> ROLLBACK to last good" >> "$CONSOLE"
@@ -63,6 +72,15 @@ for ((i=1; i<=SEGMAX; i++)); do
         mv "$F35/snap_crash" "$F35/snap"
         echo "[gha-chain] crash #$C -> resumed from crash snapshot" >> "$CONSOLE"
       fi
+    elif [ "$C" -ge 3 ]; then
+      # POISON crashes (exec fetch faults) save NO crash snapshot; the
+      # same-pc loop means the current snap itself is doomed - roll back
+      echo "[gha-chain] poison crash-loop x$C (no snapshot) -> ROLLBACK to last good" >> "$CONSOLE"
+      rm -rf "$F35/snap"
+      if [ -f "$F35/snap_good/index.json" ]; then
+        cp -r "$F35/snap_good" "$F35/snap"
+      fi
+      echo 0 > "$CRASHES_FILE"
     fi
   else
     echo 0 > "$CRASHES_FILE"

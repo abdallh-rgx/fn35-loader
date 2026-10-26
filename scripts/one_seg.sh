@@ -53,6 +53,15 @@ if grep -q "FATAL" "$LOG"; then
       rm -rf "$F35/snap"; mv "$F35/snap_crash" "$F35/snap"
       echo "[local] crash #$C -> resumed from crash snapshot" | tee -a "$CONSOLE"
     fi
+  elif [ "$C" -ge 5 ]; then
+    # POISON crashes (exec fetch faults) save NO crash snapshot; the
+    # same-pc loop means the current snap itself is doomed - roll back
+    echo "[local] poison crash-loop x$C (no snapshot) -> ROLLBACK to last good" | tee -a "$CONSOLE"
+    rm -rf "$F35/snap"
+    if [ -f "$F35/snap_good/index.json" ]; then
+      cp -r "$F35/snap_good" "$F35/snap"
+    fi
+    echo 0 > "$CRASHES_FILE"
   fi
 else
   echo 0 > "$CRASHES_FILE"
