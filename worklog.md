@@ -450,3 +450,52 @@ Stage Summary:
   VM launch grind (probe_vmpos said ~13MB bytecode, idx advancing)
 - Runner: fresh universe with the fixed engine
 - Next: keep one_seg rhythm + rust conversion (fn35-macho next)
+
+---
+Task ID: session-7 (2026-10-26 04:15Z-, marathon continuation)
+Agent: main (Z.ai)
+Task: Continue the marathon to login screen after env restore #4; execute
+pakfs uproject fix; restart runner fresh; restore full dev environment
+
+Work Log:
+- ENV RESTORE #4 complete: deps (unicorn 2.1.4, capstone, keystone,
+  pyelftools, z3, Pillow), IPA from release asset (md5 verified
+  66130a44341bdebe767d0c8471f1c1cc), mesa debs re-extracted (trixie:
+  libegl1/libgles2/libegl-mesa0/libgl1-mesa-dri/libllvm19) + ICD json
+  recreated at /home/z/mesa-debs/glvnd/50_mesa.json -> GLES 3.2
+  llvmpipe (LLVM 19.1.7) verified via GLState.init()
+- FORENSICS on runner run 40234559807 (5h20m window, 40 segments):
+  segment 22 reached main() LogInit BUT:
+    [open-proj] .../cookeddata/fortnitegame/fortnitegame.uproject -> exists=False
+    printf: LogProjectManager: Error: Failed to open descriptor file ../../../FortniteGame/FortniteGame.uproject
+    printf: LogInit: Warning: Could not find a valid project file, the engine will exit now.
+  -> pc=0 exec fetch crash = engine exit path; segments 23-40 = zombie
+  grind of the exit path (state doomed, no progress possible)
+- ROOT CAUSE: workflow extracted ONLY binary+Info.plist from the IPA;
+  pak absent -> pakfs=None on every runner run; pakfs resolve() suffix
+  matcher was never the problem
+- FIX (commit c5f444b): (1) workflow extracts Payload/.../cookeddata/*;
+  (2) find_pak() case-insensitive walker in fn35_pakfs.py (IPA stores
+  lowercase 'content/paks', canonical is 'Content/Paks'; Linux is
+  case-sensitive); (3) fn35_snap.py restore path rebuilds pakfs via
+  find_pak (save side always serialized pakfs=None)
+- VERIFIED: test_pak_paths.py ALL GREEN - all 9 guest paths from the
+  runner trace (2 uproject opens + 6 config inis + 2 dir stats)
+  resolve+materialize; descriptor content intact (FileVersion 3 JSON)
+- STATE: restored deep snapshot from artifact 12624575935 archived to
+  /home/z/restore (old-logs), then LOCAL FRESH BOOT (zombie state
+  discarded): segment 1 = init 773/773 + didFinishLaunching in ONE
+  segment (all desync fixes holding)
+- RUNNER: zombie run 40259831119 cancelled; fresh dispatch with fix ->
+  run 40269882148 grinding since 04:35:45Z
+- RUST: toolchain reinstalled (cargo 1.99.1); workspace tests all
+  green (metal 5 + differential 1); fn35-pakfs is the next conversion
+  target (just became battle-critical for the LogInit milestone)
+
+Stage Summary:
+- THE wall between us and post-LogInit territory is fixed: engine will
+  find FortniteGame.uproject + all config inis via pakfs from the pak
+- Both universes (runner + local) grinding fresh boots with the fix;
+  LogInit expected on runner in ~2.5-3h (1:1 wall clock)
+- Next: keep one_seg rhythm; convert fn35-pakfs to safe Rust with the
+  same oracle differential; watch for LogInit/open-proj in console
