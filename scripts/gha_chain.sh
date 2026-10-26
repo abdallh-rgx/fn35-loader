@@ -21,6 +21,7 @@ export MESA_DEBUG=silent
 F35=/home/z/my-project/fn35
 CONSOLE=$F35/chain_console.log
 CRASHES_FILE=$F35/.chain_crashes
+CRASHPC_FILE=$F35/.chain_crashpc
 DEADLINE=${CHAIN_DEADLINE_EPOCH:-0}
 SEGMAX=${CHAIN_SEGMAX:-1000}
 mkdir -p "$F35"
