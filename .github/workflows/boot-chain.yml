@@ -59,14 +59,17 @@ jobs:
             gdown 18U_hneRqVDFyU0M-nHv51jdHHCoiB3tm -O Fortnite35.ipa
           fi
           ls -la Fortnite35.ipa
-          unzip -q -o Fortnite35.ipa "Payload/FortniteClient.app/FortniteClient" "Payload/FortniteClient.app/Info.plist" -d extracted_tmp || \
-            unzip -q -o Fortnite35.ipa -d extracted_tmp
+          unzip -q -o Fortnite35.ipa "Payload/FortniteClient.app/FortniteClient" "Payload/FortniteClient.app/Info.plist" "Payload/FortniteClient.app/cookeddata/*" -x "__MACOSX/*" -d extracted_tmp || \
+            unzip -q -o Fortnite35.ipa -x "__MACOSX/*" -d extracted_tmp
           # place like the local layout: extracted/Payload/...
           mkdir -p extracted
           mv extracted_tmp/Payload extracted/Payload 2>/dev/null || true
           rm -rf extracted_tmp
           md5sum extracted/Payload/FortniteClient.app/FortniteClient
           # expect 66130a44341bdebe767d0c8471f1c1cc
+          # CRITICAL: the .pak must exist - pakfs serves the uproject +
+          # config inis from it (no pak => engine exits at LogInit)
+          ls -la extracted/Payload/FortniteClient.app/cookeddata/fortnitegame/content/paks/
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

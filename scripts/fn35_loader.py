@@ -2478,10 +2478,9 @@ class FNLoader:
         import os as _os
         if _os.environ.get("FN35_NOPAK", "") == "":
             app_dir = _os.path.dirname(self.macho_path)
-            pak_path = _os.path.join(
-                app_dir, "cookeddata", "fortnitegame", "content", "paks",
-                "pakchunkearly-iosclient.pak")
-            if _os.path.isfile(pak_path):
+            from fn35_pakfs import find_pak
+            pak_path = find_pak(app_dir)
+            if pak_path is not None:
                 cache = _os.path.join(_os.path.dirname(self.sandbox),
                                       "pakcache")
                 try:

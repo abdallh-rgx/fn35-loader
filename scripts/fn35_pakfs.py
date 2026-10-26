@@ -32,6 +32,35 @@ FOOTER_SIZE = 44
 COMPRESSION_NONE = 0
 
 
+def find_pak(app_dir):
+    """Case-insensitive lookup of the game pak under app_dir.
+
+    The IPA stores lowercase 'cookeddata/fortnitegame/content/paks/...' while
+    the canonical UE layout is 'Content/Paks'; host extraction may yield
+    either case (Linux is case-sensitive), so probe both + a glob fallback.
+    """
+    rel = ["cookeddata", "fortnitegame", "Content", "Paks",
+           "pakchunkearly-iosclient.pak"]
+    cand = os.path.join(app_dir, *rel)
+    if os.path.isfile(cand):
+        return cand
+    # walk case-insensitively, consuming path components one by one
+    cur = app_dir
+    for i, comp in enumerate(rel):
+        if os.path.isfile(os.path.join(cur, comp)):
+            cur = os.path.join(cur, comp)
+            continue
+        try:
+            match = [e for e in os.listdir(cur)
+                     if e.lower() == comp.lower()]
+        except OSError:
+            return None
+        if not match:
+            return None
+        cur = os.path.join(cur, match[0])
+    return cur if os.path.isfile(cur) else None
+
+
 def _find_footer(f):
     f.seek(0, 2)
     size = f.tell()

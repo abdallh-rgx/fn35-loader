@@ -355,12 +355,12 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
 
     # pakfs: deterministic rebuild (entries/parse), then runtime overlay
     if state.get("pakfs") is None:
-        pak_path = os.path.join(os.path.dirname(macho_path),
-                                "cookeddata", "fortnitegame", "content",
-                                "paks", "pakchunkearly-iosclient.pak")
+        from fn35_pakfs import PakFS, find_pak
+        pak_path = find_pak(os.path.dirname(macho_path))
         cache = os.path.join(os.path.dirname(sandbox), "pakcache")
         try:
-            from fn35_pakfs import PakFS
+            if pak_path is None:
+                raise FileNotFoundError("pak not found under app dir")
             l.pakfs = PakFS(pak_path, cache, loader_console=l.console)
         except Exception as ex:
             l.console("[snap] pakfs rebuild failed: %r" % (ex,))
