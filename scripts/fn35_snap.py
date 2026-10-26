@@ -447,14 +447,26 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
             _m = _re.search(r"pc=0x([0-9a-fA-F]+)", _note)
             if _m:
                 _fpc = int(_m.group(1), 16)
-                for _t in l.threads.values():
-                    if _t.pc == _fpc and _t.state == "ready":
-                        _t.pc = _fpc + 4
-                        import fn35_loader as _FL2
-                        _t.regs[_FL2.a64.UC_ARM64_REG_PC] = _fpc + 4
-                        l.console("[snap] crash-resume: skipped faulting "
-                                  "insn at 0x%x -> 0x%x" % (_fpc, _fpc + 4))
-                        break
+                # only skip when the faulting pc is REAL code (text/farm
+                # range). Near-null pcs (exec fetch faults) are poisoned
+                # thread state: +4 there walks 0x4 -> 0x8 -> ... and the
+                # resume faults again. Such snapshots shouldn't exist
+                # anymore (loader refuses to save them) - this is the
+                # belt-and-braces guard.
+                _real_code = (0x100000000 <= _fpc < 0x107000000
+                              or 0x400000000000 <= _fpc
+                              or 0x500000000000 <= _fpc < 0x600000100000)
+                _is_fetch = "exec fetch fault" in _note
+                if _real_code and not _is_fetch:
+                    for _t in l.threads.values():
+                        if _t.pc == _fpc and _t.state == "ready":
+                            _t.pc = _fpc + 4
+                            import fn35_loader as _FL2
+                            _t.regs[_FL2.a64.UC_ARM64_REG_PC] = _fpc + 4
+                            l.console("[snap] crash-resume: skipped faulting "
+                                      "insn at 0x%x -> 0x%x"
+                                      % (_fpc, _fpc + 4))
+                            break
     except Exception as e:
         l.console("[snap] poison-skip failed %r" % (e,))
     # sync-hook mode restore: if the snapshot was saved mid-VM-grind the

@@ -4350,18 +4350,29 @@ def main():
         # dead weight after a crash anyway -- drop it so the save works
         # (the null-call crash path leaves bt-walk entries behind and
         # the save would otherwise refuse, losing the whole segment).
-        try:
-            l.py_stack = []
-            l.pending_py = None
-        except Exception:
-            pass
-        try:
-            import fn35_snap
-            fn35_snap.save_snapshot(
-                l, snapdir + "_crash",
-                note="crash: %s" % str(l.fatal_msg)[:160])
-        except Exception:
-            pass
+        #
+        # EXCEPT exec fetch faults: the faulting thread's pc is garbage
+        # by definition (near-null branch, desync'd indirect call) and the
+        # committed register state is NOT otherwise valid -- resuming
+        # re-faults (or the +4 skip walks 0x4 -> 0x8 -> 0xc forever).
+        # Refuse the snapshot so the chain rolls back to snap_good.
+        _is_fetch = "exec fetch fault" in str(l.fatal_msg)
+        if _is_fetch:
+            print("[fn35] exec fetch fault - no crash snapshot; "
+                  "chain should roll back to snap_good")
+        else:
+            try:
+                l.py_stack = []
+                l.pending_py = None
+            except Exception:
+                pass
+            try:
+                import fn35_snap
+                fn35_snap.save_snapshot(
+                    l, snapdir + "_crash",
+                    note="crash: %s" % str(l.fatal_msg)[:160])
+            except Exception:
+                pass
 
     out = os.path.join(base, "download/fn35/fn35_boot_report.txt")
     os.makedirs(os.path.dirname(out), exist_ok=True)
