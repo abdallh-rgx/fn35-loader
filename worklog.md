@@ -592,3 +592,59 @@ Stage Summary:
 - Runner: deps fixed + state restored; next milestones should flow
 - Local: deep in the post-LogInit table construction, progressing
 - Rust conversion: 6 crates, every one differential-verified
+
+---
+Task ID: session-8 (2026-10-26 20:30Z-, marathon window 22:00->13:00 Baghdad)
+Agent: main (Z.ai)
+Task: Continue marathon to login screen; Z3 compute extension; state-restore pak fragility fix
+
+Work Log:
+- ENV RESTORE #5: sandbox was fresh (no deps, no binary, no snaps);
+  reinstalled python deps + cargo 1.99.1, IPA from release asset
+  (md5 verified), cookeddata extracted, mesa debs re-downloaded ->
+  llvmpipe (LLVM 19.1.7, 256 bits) GLES 3.2 verified via GLState.init()
+- RUNNER WINDOW-2 FORENSICS (run 40314349069 artifact):
+  * seg 18-19: pak mounted by the ENGINE's own FPakPlatformFile, then
+    "Failed to read file FortniteGame.uproject" with NO sys_open call ->
+    the read went through the engine's pak layer (the KNOWN
+    desync-fragile path documented in pak_strip_uproject.py); the exit
+    path called blr x22 with x22=0 -> pc=0 fatal
+  * segs 21-38: snap_good rollback + engine-only no-project boot grind
+    (MainAppThread 32B instr) - a DEAD END for the login screen (no
+    FortniteGame project = no game UI)
+  * decision: cancelled zombie run 40362275594; dispatched FRESH boot
+    run 40371425535 (17:44Z, default mode, fresh boots pass the
+    uproject as proven locally)
+- PHYSICAL MODEL TEST (FN35_NO_ENGINE_PAK=1): local fresh boot reached
+  init 773/773 + didFinishLaunching in ONE segment (same speed as
+  default); pak blocked -> ENOENT accepted by engine ("Pak does not
+  exist!") -> proceeds on physical+pakfs file view (run49 recipe)
+- LOCAL CHAIN: default-mode chain (2 segs) archived to snap_phys_backup;
+  phys-mode chain now grinding toward the uproject gate (VM grind)
+- TRANSPORT QUIRK DISCOVERED: the tool-result display eats "[h" (parsed
+  as a markup tag) - files are INTACT (od -c verified); only the DISPLAY
+  is affected. /tmp/safecat.sh escapes [h/[i/[t/[x etc for reading code
+- Z3 METAL COMPUTE EXTENSION (user directive #3), all layers green:
+  * spec: +5 ops (CPIPE_NEW/SMP_NEW/ENC_COMPUTE/ENC_SETCPIPE/
+    ENC_DISPATCH), +2 kinds (K_CPIPE/K_SMP), +1 state field (cb_cpipe),
+    invariants I4b/I8 + cross-slot rule, BMC props P3d/P8 + P1b extended
+  * proofs: P0 unsat x 69, P1/P3/P4/P8 20000 traces / 170389 steps /
+    0 violations, P2 monotonicity, P5 liveness
+  * safe Rust core + FFI + ctypes bridge: pipe_valid bool->u8
+    (0 none/1 render-fn/2 compute-fn), cb_cpipe field, 5 new methods
+    + FFI exports + bridge ops; full stack 300 traces / 2475 steps /
+    0 mismatches; CI selftest run 40382661742 SUCCESS
+
+Stage Summary:
+- Both universes grinding fresh boots: runner 40371425535 (default,
+  ~2h in) + local phys-mode chain (backup universe)
+- Contingency ready: if the runner's window-2 restore hits the engine-
+  pak fragility again, upload the LOCAL phys-mode snap as fn35-state
+  artifact (cross-machine compatible) and let the runner continue phys
+- Metal spec now compute-capable (dispatch/sampler semantics), 7 rust
+  crates total, all differential-green
+
+Next:
+- Watch the local phys chain for the uproject gate (open-proj lines)
+- Watch runner window-1 end ~23:09Z; decide mode strategy from its state
+- Next Z3/Rust module while segments grind
