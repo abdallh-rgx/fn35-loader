@@ -54,10 +54,16 @@ PHASE_RANK = {"P_DEAD": 0, "P_CREATED": 1, "P_ACTIVE": 2, "P_COMMITTED": 3,
 
 OPS = ["OP_NOP", "OP_DEV_NEW", "OP_QUEUE_NEW", "OP_CB_NEW", "OP_ENCODE",
        "OP_COMMIT", "OP_TICK", "OP_WAIT", "OP_BUF_NEW", "OP_BUF_WRITE",
-       "OP_TEX_NEW", "OP_TEX_WRITE", "OP_RELEASE", "OP_LIB_NEW"]
+       "OP_TEX_NEW", "OP_TEX_WRITE", "OP_RELEASE", "OP_LIB_NEW",
+       # --- render-pipeline extension (session 7) ---
+       "OP_RPASS_NEW", "OP_RPASS_ATTACH", "OP_ENC_RPASS",
+       "OP_PIPELINE_NEW", "OP_ENC_SETPIPE", "OP_ENC_DRAW",
+       "OP_ENC_BLIT", "OP_TEX_READ",
+       "OP_FENCE_NEW", "OP_FENCE_SIGNAL", "OP_FENCE_WAIT"]
 
 KINDS = ["K_NONE", "K_DEVICE", "K_QUEUE", "K_CMDBUF",
-         "K_BUFFER", "K_TEXTURE", "K_LIBRARY"]
+         "K_BUFFER", "K_TEXTURE", "K_LIBRARY",
+         "K_RPASS", "K_PIPELINE", "K_FENCE"]
 
 
 def build_sorts():
@@ -83,6 +89,11 @@ class ModelState:
         self.tex_w = [0] * n_handles
         self.tex_h = [0] * n_handles
         self.tex_levels = [0] * n_handles
+        # --- render-pipeline extension state ---
+        self.attach = [-1] * n_handles   # rpass -> texture handle
+        self.pipe_valid = [0] * n_handles  # pipeline -> has vertex fn
+        self.signaled = [0] * n_handles  # fence -> 0/1
+        self.cb_pipe = [-1] * n_handles  # cmdbuf -> bound pipeline
 
     def clone(self):
         m = ModelState(self.n)
@@ -90,6 +101,8 @@ class ModelState:
         m.err = list(self.err); m.buf_len = list(self.buf_len)
         m.tex_w = list(self.tex_w); m.tex_h = list(self.tex_h)
         m.tex_levels = list(self.tex_levels)
+        m.attach = list(self.attach); m.pipe_valid = list(self.pipe_valid)
+        m.signaled = list(self.signaled); m.cb_pipe = list(self.cb_pipe)
         return m
 
 
@@ -227,8 +240,168 @@ def step_concrete(m: ModelState, op: str, h: int, off: int, ln: int,
     if op == "OP_RELEASE":
         if not live:
             return E_DEAD           # P4: dead handles always rejected
+        # in-use guard: textures attached to a render pass and pipelines
+        # bound to a cmdbuf must not be destroyed (keeps I5/I6 inductive)
+        if m.kind[h] == "K_TEXTURE":
+            for i in range(m.n):
+                if m.attach[i] == h:
+                    return E_KIND   # still attached to a render pass
+        if m.kind[h] == "K_PIPELINE":
+            for i in range(m.n):
+                if m.cb_pipe[i] == h:
+                    return E_KIND   # still bound to a command buffer
         m.kind[h] = "K_NONE"; m.phase[h] = "P_DEAD"
         m.buf_len[h] = 0; m.err[h] = 0
+        m.attach[h] = -1; m.pipe_valid[h] = 0; m.signaled[h] = 0
+        m.cb_pipe[h] = -1
+        return OK
+
+    # ---- render-pipeline extension --------------------------------------
+    if op == "OP_RPASS_NEW":
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_DEVICE":
+            return E_KIND
+        m.kind[h] = "K_RPASS"
+        m.attach[h] = -1
+        return OK
+
+    if op == "OP_RPASS_ATTACH":
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_RPASS":
+            return E_KIND
+        t = off % m.n if off >= 0 else off   # texture slot (arg reuse)
+        if t < 0 or t >= m.n:
+            return E_DEAD
+        if m.kind[t] == "K_NONE":
+            return E_DEAD           # dead target handle (ABI parity)
+        if m.kind[t] != "K_TEXTURE":
+            return E_KIND
+        m.attach[h] = t
+        return OK
+
+    if op == "OP_ENC_RPASS":
+        # encode a render pass onto a command buffer
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_CMDBUF":
+            return E_KIND
+        if m.phase[h] != "P_ACTIVE":
+            return E_PHASE          # same encode-after-commit ban as P1
+        r = off % m.n if off >= 0 else off   # rpass slot
+        if r < 0 or r >= m.n:
+            return E_DEAD
+        if m.kind[r] == "K_NONE":
+            return E_DEAD           # dead target handle (ABI parity)
+        if m.kind[r] != "K_RPASS":
+            return E_KIND
+        if m.attach[r] < 0:
+            return E_KIND           # rpass has no color attachment
+        return OK
+
+    if op == "OP_PIPELINE_NEW":
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_LIBRARY":
+            return E_KIND           # pipelines are built from a library
+        m.kind[h] = "K_PIPELINE"
+        m.pipe_valid[h] = 1         # minimal metallib has a vertex fn
+        return OK
+
+    if op == "OP_ENC_SETPIPE":
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_CMDBUF":
+            return E_KIND
+        if m.phase[h] != "P_ACTIVE":
+            return E_PHASE
+        p = off % m.n if off >= 0 else off   # pipeline slot
+        if p < 0 or p >= m.n:
+            return E_DEAD
+        if m.kind[p] == "K_NONE":
+            return E_DEAD           # dead target handle (ABI parity)
+        if m.kind[p] != "K_PIPELINE" or m.pipe_valid[p] != 1:
+            return E_KIND
+        m.cb_pipe[h] = p
+        return OK
+
+    if op == "OP_ENC_DRAW":
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_CMDBUF":
+            return E_KIND
+        if m.phase[h] != "P_ACTIVE":
+            return E_PHASE
+        p = m.cb_pipe[h]
+        if p < 0 or p >= m.n or m.kind[p] != "K_PIPELINE" \
+                or m.pipe_valid[p] != 1:
+            return E_KIND           # draw requires a live bound pipeline
+        if x <= 0:                  # vertexCount
+            return E_BOUNDS
+        if y <= 0:                  # instanceCount
+            return E_BOUNDS
+        return OK
+
+    if op == "OP_ENC_BLIT":
+        # buffer-to-buffer copy: h=cmdbuf, off=src buffer slot,
+        # ln=dst buffer slot, x=srcOff, y=dstOff, w=size
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_CMDBUF":
+            return E_KIND
+        if m.phase[h] != "P_ACTIVE":
+            return E_PHASE
+        s = off % m.n if off >= 0 else off
+        d = ln % m.n if ln >= 0 else ln
+        if s < 0 or s >= m.n or d < 0 or d >= m.n:
+            return E_DEAD
+        if m.kind[s] == "K_NONE" or m.kind[d] == "K_NONE":
+            return E_DEAD           # dead target handle (ABI parity)
+        if m.kind[s] != "K_BUFFER" or m.kind[d] != "K_BUFFER":
+            return E_KIND
+        if x < 0 or y < 0 or w < 0 \
+                or x + w > m.buf_len[s] or y + w > m.buf_len[d]:
+            return E_BOUNDS         # both regions in bounds (P3 analogue)
+        return OK
+
+    if op == "OP_TEX_READ":
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_TEXTURE":
+            return E_KIND
+        if lvl < 0 or lvl >= m.tex_levels[h]:
+            return E_BOUNDS
+        lw = max(1, m.tex_w[h] >> lvl)
+        lh = max(1, m.tex_h[h] >> lvl)
+        if x < 0 or y < 0 or w < 0 or ht < 0 or x + w > lw or y + ht > lh:
+            return E_BOUNDS
+        return OK
+
+    if op == "OP_FENCE_NEW":
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_DEVICE":
+            return E_KIND
+        m.kind[h] = "K_FENCE"
+        m.signaled[h] = 0
+        return OK
+
+    if op == "OP_FENCE_SIGNAL":
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_FENCE":
+            return E_KIND
+        m.signaled[h] = 1
+        return OK
+
+    if op == "OP_FENCE_WAIT":
+        if not live:
+            return E_DEAD
+        if m.kind[h] != "K_FENCE":
+            return E_KIND
+        if m.signaled[h] != 1:
+            return E_PHASE          # waiting on an unsignaled fence
         return OK
 
     return OK  # OP_NOP
@@ -244,9 +417,13 @@ def symbolic_step(z, s, op, h, off, ln, x, y, w, ht, lvl, next_s):
     kind, phase, err = s["kind"], s["phase"], s["err"]
     buf_len, tex_w, tex_h, tex_levels = (s["buf_len"], s["tex_w"],
                                          s["tex_h"], s["tex_levels"])
+    attach, pipe_valid, signaled, cb_pipe = (s["attach"],
+        s["pipe_valid"], s["signaled"], s["cb_pipe"])
     nk, nph, nerr = next_s["kind"], next_s["phase"], next_s["err"]
     nbl, ntw, nth, ntl = (next_s["buf_len"], next_s["tex_w"],
                           next_s["tex_h"], next_s["tex_levels"])
+    nat, npv, nsg, ncp = (next_s["attach"], next_s["pipe_valid"],
+                          next_s["signaled"], next_s["cb_pipe"])
 
     live = kind[h] != z["K_NONE"]
     c = []
@@ -254,7 +431,8 @@ def symbolic_step(z, s, op, h, off, ln, x, y, w, ht, lvl, next_s):
     # frame: identity by default
     for (a, b) in [(kind, nk), (phase, nph), (err, nerr),
                    (buf_len, nbl), (tex_w, ntw), (tex_h, nth),
-                   (tex_levels, ntl)]:
+                   (tex_levels, ntl), (attach, nat), (pipe_valid, npv),
+                   (signaled, nsg), (cb_pipe, ncp)]:
         for i in range(z["N"]):
             c.append(a[i] == b[i])
 
@@ -285,10 +463,71 @@ def symbolic_step(z, s, op, h, off, ln, x, y, w, ht, lvl, next_s):
                             z3.And(nk[h] == z["K_TEXTURE"], ntw[h] == w,
                                    nth[h] == ht, ntl[h] == lvl)))
     elif op == "OP_RELEASE":
-        c.append(z3.Implies(live, z3.And(nk[h] == z["K_NONE"],
-                                         nph[h] == z["P_DEAD"],
-                                         nbl[h] == 0, nerr[h] == 0)))
+        # note: the in-use guard (attached texture / bound pipeline)
+        # is enforced by the CONCRETE step; symbolically we encode the
+        # successful-release effect only when no other slot references h
+        refs = []
+        for i in range(z["N"]):
+            if i != h:
+                refs.append(attach[i] == h)
+                refs.append(cb_pipe[i] == h)
+        no_refs = z3.Not(z3.Or(refs)) if refs else z3.BoolVal(True)
+        c.append(z3.Implies(live & no_refs,
+                            z3.And(nk[h] == z["K_NONE"],
+                                   nph[h] == z["P_DEAD"],
+                                   nbl[h] == 0, nerr[h] == 0,
+                                   nat[h] == -1, npv[h] == 0,
+                                   nsg[h] == 0, ncp[h] == -1)))
+    elif op == "OP_RPASS_NEW":
+        c.append(z3.Implies(live & (kind[h] == z["K_DEVICE"]),
+                            z3.And(nk[h] == z["K_RPASS"],
+                                   nat[h] == -1)))
+    elif op == "OP_RPASS_ATTACH":
+        # off is symbolic: normalize like the concrete step
+        t = z3.If(off >= 0, off % z["N"], off)
+        in_range = z3.And(t >= 0, t < z["N"])
+        c.append(z3.Implies(live & (kind[h] == z["K_RPASS"]) &
+                            in_range &
+                            (kind_at(z, s, t) == z["K_TEXTURE"]),
+                            nat[h] == t))
+    elif op == "OP_PIPELINE_NEW":
+        c.append(z3.Implies(live & (kind[h] == z["K_LIBRARY"]),
+                            z3.And(nk[h] == z["K_PIPELINE"],
+                                   npv[h] == 1)))
+    elif op == "OP_ENC_SETPIPE":
+        p = z3.If(off >= 0, off % z["N"], off)
+        in_range = z3.And(p >= 0, p < z["N"])
+        c.append(z3.Implies(live & (kind[h] == z["K_CMDBUF"]) &
+                            (phase[h] == z["P_ACTIVE"]) &
+                            in_range &
+                            (kind_at(z, s, p) == z["K_PIPELINE"]) &
+                            (kind_at_valid(z, s, p) == 1),
+                            ncp[h] == p))
+    elif op == "OP_FENCE_NEW":
+        c.append(z3.Implies(live & (kind[h] == z["K_DEVICE"]),
+                            z3.And(nk[h] == z["K_FENCE"],
+                                   nsg[h] == 0)))
+    elif op == "OP_FENCE_SIGNAL":
+        c.append(z3.Implies(live & (kind[h] == z["K_FENCE"]),
+                            nsg[h] == 1))
     return z3.And(c)
+
+
+def kind_at(z, s, idx):
+    """kind[<symbolic index>] as a nested z3 If (the state is modeled as
+    python lists of consts, so symbolic indexing needs an If-chain)."""
+    expr = z["K_NONE"]
+    for j in reversed(range(z["N"])):
+        expr = z3.If(idx == j, s["kind"][j], expr)
+    return expr
+
+
+def kind_at_valid(z, s, idx):
+    """pipe_valid[<symbolic index>] as a nested z3 If."""
+    expr = z3.IntVal(0)
+    for j in reversed(range(z["N"])):
+        expr = z3.If(idx == j, s["pipe_valid"][j], expr)
+    return expr
 
 
 def invariants(z, s):
@@ -307,6 +546,30 @@ def invariants(z, s):
         iv.append(z3.Implies(s["kind"][i] == z["K_TEXTURE"],
                              z3.And(s["tex_w"][i] > 0, s["tex_h"][i] > 0,
                                     s["tex_levels"][i] > 0)))
+        # I4: pipeline implies valid vertex function
+        iv.append(z3.Implies(s["kind"][i] == z["K_PIPELINE"],
+                             s["pipe_valid"][i] == 1))
+        # I5: render pass attachments never dangle (the kind of the
+        # referenced slot must still be a texture - guarded by the
+        # in-use rule on release)
+        iv.append(z3.Implies(z3.And(s["kind"][i] == z["K_RPASS"],
+                                   s["attach"][i] >= 0),
+                             kind_at(z, s, s["attach"][i])
+                             == z["K_TEXTURE"]))
+        # I6: a cmdbuf's bound pipeline never dangles
+        iv.append(z3.Implies(z3.And(s["kind"][i] == z["K_CMDBUF"],
+                                   s["cb_pipe"][i] >= 0),
+                             kind_at(z, s, s["cb_pipe"][i])
+                             == z["K_PIPELINE"]))
+        # I7: fence signal is boolean
+        iv.append(z3.Implies(s["kind"][i] == z["K_FENCE"],
+                             z3.Or(s["signaled"][i] == 0,
+                                   s["signaled"][i] == 1)))
+        # cross-slot references only exist for the right kinds
+        iv.append(z3.Implies(s["attach"][i] >= 0,
+                             s["kind"][i] == z["K_RPASS"]))
+        iv.append(z3.Implies(s["cb_pipe"][i] >= 0,
+                             s["kind"][i] == z["K_CMDBUF"]))
     return z3.And(iv)
 
 
@@ -317,7 +580,8 @@ def run_proofs():
     z["Phase"], z["Op"], z["Kind"] = Phase, Op, Kind
     z["phase_c"], z["kind_c"] = phase_c, kind_c
     (z["K_NONE"], z["K_DEVICE"], z["K_QUEUE"], z["K_CMDBUF"],
-     z["K_BUFFER"], z["K_TEXTURE"], z["K_LIBRARY"]) = tuple(kind_c)
+     z["K_BUFFER"], z["K_TEXTURE"], z["K_LIBRARY"], z["K_RPASS"],
+     z["K_PIPELINE"], z["K_FENCE"]) = tuple(kind_c)
     (z["P_DEAD"], _, z["P_ACTIVE"], z["P_COMMITTED"], z["P_SCHEDULED"],
      z["P_COMPLETED"], z["P_ERRORED"]) = tuple(phase_c)
     z["N"] = 3  # handle universe size for the symbolic model
@@ -330,7 +594,11 @@ def run_proofs():
              "buf_len": [z3.Int(f"bl_{tag}_{i}") for i in range(z["N"])],
              "tex_w": [z3.Int(f"tw_{tag}_{i}") for i in range(z["N"])],
              "tex_h": [z3.Int(f"th_{tag}_{i}") for i in range(z["N"])],
-             "tex_levels": [z3.Int(f"tl_{tag}_{i}") for i in range(z["N"])]}
+             "tex_levels": [z3.Int(f"tl_{tag}_{i}") for i in range(z["N"])],
+             "attach": [z3.Int(f"at_{tag}_{i}") for i in range(z["N"])],
+             "pipe_valid": [z3.Int(f"pv_{tag}_{i}") for i in range(z["N"])],
+             "signaled": [z3.Int(f"sg_{tag}_{i}") for i in range(z["N"])],
+             "cb_pipe": [z3.Int(f"cp_{tag}_{i}") for i in range(z["N"])]}
         return s
 
     # ---- P0: inductive invariance of the consistency invariant ----
@@ -339,8 +607,13 @@ def run_proofs():
     solver = z3.Solver()
     solver.add(invariants(z, s0))
     # arbitrary op/h/args
-    for op in ["OP_CB_NEW", "OP_COMMIT", "OP_TICK", "OP_BUF_NEW",
-               "OP_TEX_NEW", "OP_RELEASE", "OP_ENCODE"]:
+    PROVE_OPS = ["OP_CB_NEW", "OP_COMMIT", "OP_TICK", "OP_BUF_NEW",
+                 "OP_TEX_NEW", "OP_RELEASE", "OP_ENCODE",
+                 "OP_RPASS_NEW", "OP_RPASS_ATTACH", "OP_ENC_RPASS",
+                 "OP_PIPELINE_NEW", "OP_ENC_SETPIPE", "OP_ENC_DRAW",
+                 "OP_ENC_BLIT", "OP_TEX_READ", "OP_FENCE_NEW",
+                 "OP_FENCE_SIGNAL", "OP_FENCE_WAIT"]
+    for op in PROVE_OPS:
         for h in range(z["N"]):
             solver.push()
             solver.add(symbolic_step(z, s0, op, h,
@@ -353,7 +626,7 @@ def run_proofs():
             assert r == z3.unsat, f"INDUCTIVENESS FAILED for {op} h={h}"
             solver.pop()
     print("[P0] inductive invariance of consistency Inv: PROVED (unsat x "
-          f"{len(['OP_CB_NEW','OP_COMMIT','OP_TICK','OP_BUF_NEW','OP_TEX_NEW','OP_RELEASE','OP_ENCODE']) * z['N']})")
+          f"{len(PROVE_OPS) * z['N']})")
 
     # ---- P1: no encode-after-commit (BMC over a concrete trace space) ----
     # Enumerate op sequences on the CONCRETE model; if any trace accepts an
@@ -362,7 +635,11 @@ def run_proofs():
     ops_pool = ["OP_DEV_NEW", "OP_QUEUE_NEW", "OP_CB_NEW", "OP_ENCODE",
                 "OP_COMMIT", "OP_TICK", "OP_WAIT", "OP_BUF_NEW",
                 "OP_BUF_WRITE", "OP_TEX_NEW", "OP_TEX_WRITE",
-                "OP_RELEASE", "OP_LIB_NEW", "OP_NOP"]
+                "OP_RELEASE", "OP_LIB_NEW", "OP_NOP",
+                "OP_RPASS_NEW", "OP_RPASS_ATTACH", "OP_ENC_RPASS",
+                "OP_PIPELINE_NEW", "OP_ENC_SETPIPE", "OP_ENC_DRAW",
+                "OP_ENC_BLIT", "OP_TEX_READ",
+                "OP_FENCE_NEW", "OP_FENCE_SIGNAL", "OP_FENCE_WAIT"]
     # slot preference: 70% pick a slot where the op is APPLICABLE
     # (builds real DEV->QUEUE->CB->COMMIT->TICK chains), 30% adversarial
     # random slots (drives the dead/kind rejection paths). Op order and
@@ -379,16 +656,29 @@ def run_proofs():
         "OP_ENCODE": {"K_CMDBUF"}, "OP_COMMIT": {"K_CMDBUF"},
         "OP_TICK": {"K_CMDBUF"}, "OP_WAIT": {"K_CMDBUF"},
         "OP_RELEASE": {"K_DEVICE", "K_QUEUE", "K_CMDBUF", "K_BUFFER",
-                       "K_TEXTURE", "K_LIBRARY"},
+                       "K_TEXTURE", "K_LIBRARY", "K_RPASS",
+                       "K_PIPELINE", "K_FENCE"},
         "OP_NOP": set(),
+        "OP_RPASS_NEW": {"K_DEVICE"},
+        "OP_RPASS_ATTACH": {"K_RPASS"},
+        "OP_ENC_RPASS": {"K_CMDBUF"},
+        "OP_PIPELINE_NEW": {"K_LIBRARY"},
+        "OP_ENC_SETPIPE": {"K_CMDBUF"},
+        "OP_ENC_DRAW": {"K_CMDBUF"},
+        "OP_ENC_BLIT": {"K_CMDBUF"},
+        "OP_TEX_READ": {"K_TEXTURE"},
+        "OP_FENCE_NEW": {"K_DEVICE"},
+        "OP_FENCE_SIGNAL": {"K_FENCE"},
+        "OP_FENCE_WAIT": {"K_FENCE"},
     }
 
     def progressive_op(m, rng):
         """Pick the op that ADVANCES the most-developed slot through its
         lifecycle; used with prob ~0.55 so half the steps stay random/
         adversarial (rejection paths still well covered)."""
-        RANK = ["K_NONE", "K_LIBRARY", "K_TEXTURE", "K_BUFFER",
-                "K_QUEUE", "K_CMDBUF", "K_DEVICE"]
+        RANK = ["K_NONE", "K_LIBRARY", "K_PIPELINE", "K_TEXTURE",
+                "K_FENCE", "K_RPASS", "K_BUFFER", "K_QUEUE",
+                "K_CMDBUF", "K_DEVICE"]
         best, best_rank = None, -1
         for i in range(4):
             r = RANK.index(m.kind[i]) if m.kind[i] in RANK else 0
@@ -399,20 +689,48 @@ def run_proofs():
         k = m.kind[best]
         if k == "K_DEVICE":
             return rng.choice(["OP_QUEUE_NEW", "OP_BUF_NEW", "OP_TEX_NEW",
-                               "OP_LIB_NEW"]), best
+                               "OP_LIB_NEW", "OP_RPASS_NEW", "OP_FENCE_NEW"]), best
         if k == "K_QUEUE":
             return "OP_CB_NEW", best
         if k == "K_CMDBUF":
             ph = m.phase[best]
             if ph == "P_ACTIVE":
-                return rng.choice(["OP_ENCODE", "OP_ENCODE", "OP_COMMIT"]), best
+                # drive the encode family too: rpass / setpipe / draw / blit
+                enc = ["OP_ENCODE", "OP_ENCODE"]
+                if any(m.kind[i] == "K_RPASS" and m.attach[i] >= 0
+                       for i in range(4)):
+                    enc.append("OP_ENC_RPASS")
+                if any(m.kind[i] == "K_PIPELINE" for i in range(4)):
+                    enc.append("OP_ENC_SETPIPE")
+                    if m.cb_pipe[best] >= 0:
+                        enc += ["OP_ENC_DRAW", "OP_ENC_DRAW"]
+                if sum(1 for i in range(4)
+                       if m.kind[i] == "K_BUFFER") >= 2:
+                    enc.append("OP_ENC_BLIT")
+                enc.append("OP_COMMIT")
+                return rng.choice(enc), best
             if ph in ("P_COMMITTED", "P_SCHEDULED"):
                 return "OP_TICK", best
             return rng.choice(["OP_WAIT", "OP_RELEASE"]), best
         if k == "K_BUFFER":
             return "OP_BUF_WRITE", best
         if k == "K_TEXTURE":
-            return "OP_TEX_WRITE", best
+            return rng.choice(["OP_TEX_WRITE", "OP_TEX_READ"]), best
+        if k == "K_LIBRARY":
+            return "OP_PIPELINE_NEW", best
+        if k == "K_RPASS":
+            texs = [i for i in range(4) if m.kind[i] == "K_TEXTURE"]
+            if texs:
+                return "OP_RPASS_ATTACH", best  # off arg randomized below
+            return "OP_RELEASE", best
+        if k == "K_PIPELINE":
+            cbs = [i for i in range(4) if m.kind[i] == "K_CMDBUF"]
+            if cbs:
+                return "OP_ENC_SETPIPE", rng.choice(cbs)
+            return "OP_RELEASE", best
+        if k == "K_FENCE":
+            return rng.choice(["OP_FENCE_SIGNAL", "OP_FENCE_SIGNAL",
+                               "OP_FENCE_WAIT"]), best
         return "OP_RELEASE", best
 
     n_viol, traces = 0, []
@@ -433,6 +751,29 @@ def run_proofs():
                     h = rng.randrange(4)
             args = {k: rng.choice([0, 1, 2, 4, 8, 16, 64, 128, -1, 1000])
                     for k in ("off", "ln", "x", "y", "w", "ht", "lvl")}
+            # slot-targeting ops: point the off/ln args at real slots so
+            # the ACCEPT paths of rpass-attach/enc-rpass/setpipe/blit fire
+            if op == "OP_RPASS_ATTACH":
+                texs = [i for i in range(4) if m.kind[i] == "K_TEXTURE"]
+                if texs:
+                    args["off"] = rng.choice(texs)
+            elif op == "OP_ENC_RPASS":
+                rps = [i for i in range(4) if m.kind[i] == "K_RPASS"
+                        and m.attach[i] >= 0]
+                if rps:
+                    args["off"] = rng.choice(rps)
+            elif op == "OP_ENC_SETPIPE":
+                pls = [i for i in range(4) if m.kind[i] == "K_PIPELINE"]
+                if pls:
+                    args["off"] = rng.choice(pls)
+            elif op == "OP_ENC_DRAW":
+                args["x"] = rng.choice([1, 3, 64, 1000])  # vc > 0
+                args["y"] = rng.choice([1, 2, 4])          # ic >= 1
+            elif op == "OP_ENC_BLIT":
+                bfs = [i for i in range(4) if m.kind[i] == "K_BUFFER"]
+                if len(bfs) >= 2:
+                    args["off"], args["ln"] = rng.sample(bfs, 2)
+                    args["x"], args["y"], args["w"] = 0, 0, 1
             # OP_CB_NEW reuses h as queue->cmdbuf slot
             phase_before = m.phase[h]
             kind_before = m.kind[h]
@@ -441,15 +782,35 @@ def run_proofs():
             # P1: encode accepted => phase was ACTIVE at the call
             if op == "OP_ENCODE" and rc == 0 and phase_before != "P_ACTIVE":
                 n_viol += 1
+            # P1b: render-pass/draw/blit encodes accepted => ACTIVE
+            if op in ("OP_ENC_RPASS", "OP_ENC_SETPIPE", "OP_ENC_DRAW",
+                      "OP_ENC_BLIT") and rc == 0 \
+                    and phase_before != "P_ACTIVE":
+                n_viol += 1
             # P3: buf write accepted => bounds hold
             if op == "OP_BUF_WRITE" and rc == 0 and \
                     not (0 <= args["off"] and args["off"] + args["ln"] <= m.buf_len[h]):
                 n_viol += 1
+            # P3b: draw accepted => vc>0 and ic>0
+            if op == "OP_ENC_DRAW" and rc == 0 and \
+                    not (args["x"] > 0 and args["y"] > 0):
+                n_viol += 1
+            # P3c: blit accepted => both regions in bounds
+            if op == "OP_ENC_BLIT" and rc == 0:
+                s = args["off"] % 4 if args["off"] >= 0 else args["off"]
+                d = args["ln"] % 4 if args["ln"] >= 0 else args["ln"]
+                if not (0 <= s < 4 and 0 <= d < 4
+                        and 0 <= args["x"] and args["x"] + args["w"] <= m.buf_len[s]
+                        and 0 <= args["y"] and args["y"] + args["w"] <= m.buf_len[d]):
+                    n_viol += 1
             # P4: access ops on a dead handle are always rejected
             # (RELEASE legitimately ends dead; DEV_NEW allocates it;
             #  NOP touches nothing)
             if rc == 0 and m.kind[h] == "K_NONE" and \
                     op not in ("OP_NOP", "OP_RELEASE", "OP_DEV_NEW"):
+                n_viol += 1
+            # P6: fence wait accepted => fence was signaled
+            if op == "OP_FENCE_WAIT" and rc == 0 and m.signaled[h] != 1:
                 n_viol += 1
             trace.append((op, h, args, rc))
         traces.append(trace)

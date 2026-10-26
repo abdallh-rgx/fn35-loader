@@ -44,6 +44,9 @@ pub enum Kind {
     Buffer = 4,
     Texture = 5,
     Library = 6,
+    Rpass = 7,
+    Pipeline = 8,
+    Fence = 9,
 }
 
 impl Kind {
@@ -123,16 +126,29 @@ pub struct Object {
     pub buf: Vec<u8>,
     pub tex: Option<TextureInfo>,
     pub lib: Option<LibraryInfo>,
+    // --- render-pipeline extension (Z3 spec session 7) ---
+    /// render pass -> color-attachment texture handle (0 = none)
+    pub attach: u64,
+    /// pipeline -> has a valid vertex function
+    pub pipe_valid: bool,
+    /// fence -> signaled flag
+    pub signaled: bool,
+    /// cmdbuf -> bound pipeline handle (0 = none)
+    pub cb_pipe: u64,
 }
 
 impl Object {
     fn new_device() -> Self {
         Object { kind: Kind::Device, phase: Phase::Dead, err: 0,
-                 buf: Vec::new(), tex: None, lib: None }
+                 buf: Vec::new(), tex: None, lib: None,
+                 attach: 0, pipe_valid: false, signaled: false,
+                 cb_pipe: 0 }
     }
     fn dead() -> Self {
         Object { kind: Kind::None, phase: Phase::Dead, err: 0,
-                 buf: Vec::new(), tex: None, lib: None }
+                 buf: Vec::new(), tex: None, lib: None,
+                 attach: 0, pipe_valid: false, signaled: false,
+                 cb_pipe: 0 }
     }
 }
 
@@ -229,6 +245,7 @@ impl MetalState {
         let h = self.alloc(|| Object {
             kind: Kind::Queue, phase: Phase::Dead, err: 0,
             buf: Vec::new(), tex: None, lib: None,
+            attach: 0, pipe_valid: false, signaled: false, cb_pipe: 0,
         });
         (h, OK)
     }
@@ -241,6 +258,7 @@ impl MetalState {
         let h = self.alloc(|| Object {
             kind: Kind::CmdBuf, phase: Phase::Active, err: 0,
             buf: Vec::new(), tex: None, lib: None,
+            attach: 0, pipe_valid: false, signaled: false, cb_pipe: 0,
         });
         (h, OK)
     }
@@ -346,6 +364,7 @@ impl MetalState {
         let h = self.alloc(|| Object {
             kind: Kind::Buffer, phase: Phase::Dead, err: 0,
             buf: storage, tex: None, lib: None,
+            attach: 0, pipe_valid: false, signaled: false, cb_pipe: 0,
         });
         if length > MAX_BUFFER_BYTES {
             // record the logical length where the shadow can't see it:
@@ -450,6 +469,7 @@ impl MetalState {
                 planes: Vec::new(),
             }),
             lib: None,
+            attach: 0, pipe_valid: false, signaled: false, cb_pipe: 0,
         });
         (h_, OK)
     }
@@ -578,6 +598,7 @@ impl MetalState {
             kind: Kind::Library, phase: Phase::Dead, err: 0,
             buf: Vec::new(), tex: None,
             lib: Some(LibraryInfo { functions }),
+            attach: 0, pipe_valid: false, signaled: false, cb_pipe: 0,
         });
         (h, OK)
     }
@@ -612,7 +633,220 @@ impl MetalState {
             Some(o) if o.kind != Kind::None => {}
             _ => return self.set_err(E_DEAD),
         }
+        // in-use guards (keep attachments/bindings from dangling -
+        // the Z3 I5/I6 invariants depend on this)
+        let kind = self.objects.get(&h).map(|o| o.kind);
+        if kind == Some(Kind::Texture) {
+            let in_use = self.objects.values()
+                .any(|o| o.kind == Kind::Rpass && o.attach == h);
+            if in_use {
+                return self.set_err(E_KIND); // attached to a render pass
+            }
+        }
+        if kind == Some(Kind::Pipeline) {
+            let in_use = self.objects.values()
+                .any(|o| o.kind == Kind::CmdBuf && o.cb_pipe == h);
+            if in_use {
+                return self.set_err(E_KIND); // bound to a command buffer
+            }
+        }
         self.objects.insert(h, Object::dead());
+        OK
+    }
+
+    // -----------------------------------------------------------------------
+    // Render-pipeline extension (guards are the Z3 spec, verbatim)
+    // -----------------------------------------------------------------------
+    pub fn rpass_new(&mut self, dev: u64) -> (u64, u32) {
+        match self.get(dev) {
+            Some(o) if o.kind == Kind::Device => {}
+            Some(_) => return (0, self.set_err(E_KIND)),
+            None => return (0, self.set_err(E_DEAD)),
+        }
+        let h = self.alloc(|| Object {
+            kind: Kind::Rpass, phase: Phase::Dead, err: 0,
+            buf: Vec::new(), tex: None, lib: None,
+            attach: 0, pipe_valid: false, signaled: false, cb_pipe: 0 });
+        (h, 0)
+    }
+
+    pub fn rpass_attach(&mut self, rpass: u64, texture: u64) -> u32 {
+        match self.get(rpass) {
+            Some(o) if o.kind == Kind::Rpass => {}
+            Some(_) => return self.set_err(E_KIND),
+            None => return self.set_err(E_DEAD),
+        }
+        match self.get(texture) {
+            Some(o) if o.kind == Kind::Texture => {}
+            Some(_) => return self.set_err(E_KIND),
+            None => return self.set_err(E_DEAD),
+        }
+        self.objects.get_mut(&rpass).unwrap().attach = texture;
+        OK
+    }
+
+    pub fn enc_rpass(&mut self, cb: u64, rpass: u64) -> u32 {
+        match self.get(cb) {
+            Some(o) if o.kind == Kind::CmdBuf => {
+                if o.phase != Phase::Active {
+                    return self.set_err(E_PHASE);
+                }
+            }
+            Some(_) => return self.set_err(E_KIND),
+            None => return self.set_err(E_DEAD),
+        }
+        match self.get(rpass) {
+            Some(o) if o.kind == Kind::Rpass => {
+                if o.attach == 0 {
+                    return self.set_err(E_KIND); // no color attachment
+                }
+            }
+            Some(_) => return self.set_err(E_KIND),
+            None => return self.set_err(E_DEAD),
+        }
+        // verify the attachment still resolves (I5 at runtime)
+        let at = self.objects.get(&rpass).unwrap().attach;
+        match self.get(at) {
+            Some(o) if o.kind == Kind::Texture => {}
+            _ => return self.set_err(E_KIND),
+        }
+        OK
+    }
+
+    pub fn pipeline_new(&mut self, lib: u64) -> (u64, u32) {
+        match self.get(lib) {
+            Some(o) if o.kind == Kind::Library => {}
+            Some(_) => return (0, self.set_err(E_KIND)),
+            None => return (0, self.set_err(E_DEAD)),
+        }
+        let has_fn = self.objects.get(&lib)
+            .and_then(|o| o.lib.as_ref())
+            .map(|l| !l.functions.is_empty())
+            .unwrap_or(false);
+        if !has_fn {
+            return (0, self.set_err(E_PARSE));
+        }
+        let h = self.alloc(|| Object {
+            kind: Kind::Pipeline, phase: Phase::Dead, err: 0,
+            buf: Vec::new(), tex: None, lib: None,
+            attach: 0, pipe_valid: true, signaled: false, cb_pipe: 0 });
+        (h, 0)
+    }
+
+    pub fn enc_setpipe(&mut self, cb: u64, pipeline: u64) -> u32 {
+        match self.get(cb) {
+            Some(o) if o.kind == Kind::CmdBuf => {
+                if o.phase != Phase::Active {
+                    return self.set_err(E_PHASE);
+                }
+            }
+            Some(_) => return self.set_err(E_KIND),
+            None => return self.set_err(E_DEAD),
+        }
+        match self.get(pipeline) {
+            Some(o) if o.kind == Kind::Pipeline && o.pipe_valid => {}
+            Some(_) => return self.set_err(E_KIND),
+            None => return self.set_err(E_DEAD),
+        }
+        self.objects.get_mut(&cb).unwrap().cb_pipe = pipeline;
+        OK
+    }
+
+    pub fn enc_draw(&mut self, cb: u64, vertex_count: u64,
+                    instance_count: u64) -> u32 {
+        match self.get(cb) {
+            Some(o) if o.kind == Kind::CmdBuf => {
+                if o.phase != Phase::Active {
+                    return self.set_err(E_PHASE);
+                }
+            }
+            Some(_) => return self.set_err(E_KIND),
+            None => return self.set_err(E_DEAD),
+        }
+        let pipe = self.objects.get(&cb).unwrap().cb_pipe;
+        match self.get(pipe) {
+            Some(o) if o.kind == Kind::Pipeline && o.pipe_valid => {}
+            _ => return self.set_err(E_KIND), // draw requires a bound pipeline
+        }
+        if vertex_count == 0 || vertex_count > u32::MAX as u64 {
+            return self.set_err(E_BOUNDS);
+        }
+        if instance_count == 0 || instance_count > u32::MAX as u64 {
+            return self.set_err(E_BOUNDS);
+        }
+        OK
+    }
+
+    pub fn enc_blit(&mut self, cb: u64, src: u64, dst: u64,
+                    src_off: u64, dst_off: u64, size: u64) -> u32 {
+        match self.get(cb) {
+            Some(o) if o.kind == Kind::CmdBuf => {
+                if o.phase != Phase::Active {
+                    return self.set_err(E_PHASE);
+                }
+            }
+            Some(_) => return self.set_err(E_KIND),
+            None => return self.set_err(E_DEAD),
+        }
+        // dead-target checks for BOTH sides first (spec: slot-range and
+        // dead-slot checks precede kind checks - keeps E_DEAD priority
+        // over E_KIND when one side is dead and the other mistyped)
+        match (self.get(src), self.get(dst)) {
+            (Some(s), Some(d)) if s.kind != Kind::None
+                && d.kind != Kind::None => {}
+            _ => return self.set_err(E_DEAD),
+        }
+        let slen = match self.get(src) {
+            Some(o) if o.kind == Kind::Buffer => o.buf.len() as u64,
+            Some(_) => return self.set_err(E_KIND),
+            None => return self.set_err(E_DEAD),
+        };
+        let dlen = match self.get(dst) {
+            Some(o) if o.kind == Kind::Buffer => o.buf.len() as u64,
+            Some(_) => return self.set_err(E_KIND),
+            None => return self.set_err(E_DEAD),
+        };
+        let over = |a: u64, n: u64, len: u64| a.checked_add(n)
+            .map(|e| e <= len).unwrap_or(false);
+        if !over(src_off, size, slen) || !over(dst_off, size, dlen) {
+            return self.set_err(E_BOUNDS);
+        }
+        OK
+    }
+
+    pub fn fence_new(&mut self, dev: u64) -> (u64, u32) {
+        match self.get(dev) {
+            Some(o) if o.kind == Kind::Device => {}
+            Some(_) => return (0, self.set_err(E_KIND)),
+            None => return (0, self.set_err(E_DEAD)),
+        }
+        let h = self.alloc(|| Object {
+            kind: Kind::Fence, phase: Phase::Dead, err: 0,
+            buf: Vec::new(), tex: None, lib: None,
+            attach: 0, pipe_valid: false, signaled: false, cb_pipe: 0 });
+        (h, 0)
+    }
+
+    pub fn fence_signal(&mut self, f: u64) -> u32 {
+        match self.get(f) {
+            Some(o) if o.kind == Kind::Fence => {}
+            Some(_) => return self.set_err(E_KIND),
+            None => return self.set_err(E_DEAD),
+        }
+        self.objects.get_mut(&f).unwrap().signaled = true;
+        OK
+    }
+
+    pub fn fence_wait(&mut self, f: u64) -> u32 {
+        match self.get(f) {
+            Some(o) if o.kind == Kind::Fence => {
+                if !o.signaled {
+                    return self.set_err(E_PHASE); // unsignaled fence
+                }
+            }
+            Some(_) => return self.set_err(E_KIND),
+            None => return self.set_err(E_DEAD),
+        }
         OK
     }
 }

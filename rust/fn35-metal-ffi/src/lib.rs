@@ -374,3 +374,96 @@ unsafe fn safe_slice<'a>(ptr: *const u8, len: u64) -> Option<&'a [u8]> {
 // keep c_int linked in for future int-returning API surface
 #[allow(dead_code)]
 fn _unused(_: c_int) {}
+
+// ---------------------------------------------------------------------------
+// render-pipeline extension (Z3 spec session 7)
+// ---------------------------------------------------------------------------
+#[no_mangle]
+pub extern "C" fn fn35_metal_rpass_new(dev: u64) -> u64 {
+    match state().lock() {
+        Ok(mut g) => {
+            let (h, rc) = g.rpass_new(dev);
+            if rc != OK {
+                g.set_last_error(rc);
+            }
+            h
+        }
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_rpass_attach(rpass: u64, texture: u64) -> u32 {
+    fin(state().lock()
+        .map(|mut g| g.rpass_attach(rpass, texture))
+        .unwrap_or(1))
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_enc_rpass(cb: u64, rpass: u64) -> u32 {
+    fin(state().lock()
+        .map(|mut g| g.enc_rpass(cb, rpass))
+        .unwrap_or(1))
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_pipeline_new(lib: u64) -> u64 {
+    match state().lock() {
+        Ok(mut g) => {
+            let (h, rc) = g.pipeline_new(lib);
+            if rc != OK {
+                g.set_last_error(rc);
+            }
+            h
+        }
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_enc_setpipe(cb: u64, pipeline: u64) -> u32 {
+    fin(state().lock()
+        .map(|mut g| g.enc_setpipe(cb, pipeline))
+        .unwrap_or(1))
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_enc_draw(cb: u64, vertex_count: u64,
+                                     instance_count: u64) -> u32 {
+    fin(state().lock()
+        .map(|mut g| g.enc_draw(cb, vertex_count, instance_count))
+        .unwrap_or(1))
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_enc_blit(cb: u64, src: u64, dst: u64,
+                                      src_off: u64, dst_off: u64,
+                                      size: u64) -> u32 {
+    fin(state().lock()
+        .map(|mut g| g.enc_blit(cb, src, dst, src_off, dst_off, size))
+        .unwrap_or(1))
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_fence_new(dev: u64) -> u64 {
+    match state().lock() {
+        Ok(mut g) => {
+            let (h, rc) = g.fence_new(dev);
+            if rc != OK {
+                g.set_last_error(rc);
+            }
+            h
+        }
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_fence_signal(f: u64) -> u32 {
+    fin(state().lock().map(|mut g| g.fence_signal(f)).unwrap_or(1))
+}
+
+#[no_mangle]
+pub extern "C" fn fn35_metal_fence_wait(f: u64) -> u32 {
+    fin(state().lock().map(|mut g| g.fence_wait(f)).unwrap_or(1))
+}

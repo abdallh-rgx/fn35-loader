@@ -332,6 +332,53 @@ def selftest():
                 got = f.lib.fn35_metal_tex_check_region(cur_h, U32(x),
                                                         U32(y), U32(w),
                                                         U32(ht), U32(lvl))
+            elif op == "OP_TEX_READ":
+                got = f.lib.fn35_metal_tex_check_region(cur_h, U32(x),
+                                                        U32(y), U32(w),
+                                                        U32(ht), U32(lvl))
+            elif op == "OP_RPASS_NEW":
+                nh = f.lib.fn35_metal_rpass_new(cur_h)
+                if nh:
+                    slots[h] = nh
+                else:
+                    got = f.lib.fn35_metal_last_error()
+            elif op == "OP_RPASS_ATTACH":
+                t = off % 4 if off >= 0 else off
+                th = slots[t] if 0 <= t < 4 else None
+                got = f.lib.fn35_metal_rpass_attach(cur_h, th or 0)
+            elif op == "OP_ENC_RPASS":
+                r = off % 4 if off >= 0 else off
+                rh = slots[r] if 0 <= r < 4 else None
+                got = f.lib.fn35_metal_enc_rpass(cur_h, rh or 0)
+            elif op == "OP_PIPELINE_NEW":
+                nh = f.lib.fn35_metal_pipeline_new(cur_h)
+                if nh:
+                    slots[h] = nh
+                else:
+                    got = f.lib.fn35_metal_last_error()
+            elif op == "OP_ENC_SETPIPE":
+                p = off % 4 if off >= 0 else off
+                ph = slots[p] if 0 <= p < 4 else None
+                got = f.lib.fn35_metal_enc_setpipe(cur_h, ph or 0)
+            elif op == "OP_ENC_DRAW":
+                got = f.lib.fn35_metal_enc_draw(cur_h, U64(x), U64(y))
+            elif op == "OP_ENC_BLIT":
+                s = off % 4 if off >= 0 else off
+                d = ln % 4 if ln >= 0 else ln
+                sh = slots[s] if 0 <= s < 4 else None
+                dh = slots[d] if 0 <= d < 4 else None
+                got = f.lib.fn35_metal_enc_blit(cur_h, sh or 0, dh or 0,
+                                                U64(x), U64(y), U64(w))
+            elif op == "OP_FENCE_NEW":
+                nh = f.lib.fn35_metal_fence_new(cur_h)
+                if nh:
+                    slots[h] = nh
+                else:
+                    got = f.lib.fn35_metal_last_error()
+            elif op == "OP_FENCE_SIGNAL":
+                got = f.lib.fn35_metal_fence_signal(cur_h)
+            elif op == "OP_FENCE_WAIT":
+                got = f.lib.fn35_metal_fence_wait(cur_h)
             elif op == "OP_RELEASE":
                 got = f.release(cur_h)
                 if got == 0:
@@ -356,7 +403,7 @@ def selftest():
     return 0
 
 
-_METD = b'{"functions":[]}'
+_METD = b'{"functions":["vshader"]}'
 MINIMAL_METALLIB = (
     b"MTLB" + (2).to_bytes(4, "little") +
     b"METD" + len(_METD).to_bytes(4, "little") + _METD +

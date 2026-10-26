@@ -50,6 +50,9 @@ fn kind_of(s: &str) -> u32 {
         "K_BUFFER" => Kind::Buffer.as_u32(),
         "K_TEXTURE" => Kind::Texture.as_u32(),
         "K_LIBRARY" => Kind::Library.as_u32(),
+        "K_RPASS" => Kind::Rpass.as_u32(),
+        "K_PIPELINE" => Kind::Pipeline.as_u32(),
+        "K_FENCE" => Kind::Fence.as_u32(),
         _ => panic!("unknown kind {s}"),
     }
 }
@@ -69,7 +72,7 @@ fn phase_of(s: &str) -> u32 {
 
 /// the metallib blob the Python harness feeds OP_LIB_NEW
 fn minimal_metallib() -> Vec<u8> {
-    let metd = b"{\"functions\":[]}";
+    let metd = b"{\"functions\":[\"vshader\"]}";
     let mut d = Vec::new();
     d.extend_from_slice(b"MTLB");
     d.extend_from_slice(&2u32.to_le_bytes());
@@ -157,6 +160,56 @@ fn z3_oracle_conformance() {
                                              u32v(a.w), u32v(a.ht),
                                              u32v(a.lvl))
                 }
+                "OP_TEX_READ" => {
+                    got = m.tex_check_region(h, u32v(a.x), u32v(a.y),
+                                             u32v(a.w), u32v(a.ht),
+                                             u32v(a.lvl))
+                }
+                "OP_RPASS_NEW" => match m.rpass_new(h) {
+                    (nh, 0) if nh != 0 => slots[step.h] = nh,
+                    (_, rc) => got = rc,
+                },
+                "OP_RPASS_ATTACH" => {
+                    let t = if a.off >= 0 { (a.off % 4) as usize } else {
+                        usize::MAX };
+                    let th = if t < 4 { slots[t] } else { 0 };
+                    got = m.rpass_attach(h, th)
+                }
+                "OP_ENC_RPASS" => {
+                    let r = if a.off >= 0 { (a.off % 4) as usize } else {
+                        usize::MAX };
+                    let rh = if r < 4 { slots[r] } else { 0 };
+                    got = m.enc_rpass(h, rh)
+                }
+                "OP_PIPELINE_NEW" => match m.pipeline_new(h) {
+                    (nh, 0) if nh != 0 => slots[step.h] = nh,
+                    (_, rc) => got = rc,
+                },
+                "OP_ENC_SETPIPE" => {
+                    let p = if a.off >= 0 { (a.off % 4) as usize } else {
+                        usize::MAX };
+                    let ph = if p < 4 { slots[p] } else { 0 };
+                    got = m.enc_setpipe(h, ph)
+                }
+                "OP_ENC_DRAW" => {
+                    got = m.enc_draw(h, u64v(a.x), u64v(a.y))
+                }
+                "OP_ENC_BLIT" => {
+                    let s = if a.off >= 0 { (a.off % 4) as usize } else {
+                        usize::MAX };
+                    let d = if a.ln >= 0 { (a.ln % 4) as usize } else {
+                        usize::MAX };
+                    let sh = if s < 4 { slots[s] } else { 0 };
+                    let dh = if d < 4 { slots[d] } else { 0 };
+                    got = m.enc_blit(h, sh, dh, u64v(a.x), u64v(a.y),
+                                     u64v(a.w))
+                }
+                "OP_FENCE_NEW" => match m.fence_new(h) {
+                    (nh, 0) if nh != 0 => slots[step.h] = nh,
+                    (_, rc) => got = rc,
+                },
+                "OP_FENCE_SIGNAL" => got = m.fence_signal(h),
+                "OP_FENCE_WAIT" => got = m.fence_wait(h),
                 "OP_LIB_NEW" => match m.lib_new(h, &mm) {
                     (nh, 0) if nh != 0 => slots[step.h] = nh,
                     (_, rc) => got = rc,
