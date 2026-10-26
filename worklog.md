@@ -552,3 +552,43 @@ Stage Summary:
   machine-checked
 - Next: keep grinding to LogSlate/LogRHI; watch runner artifact;
   convert next Python module (fn35_clib printf family is a candidate)
+
+---
+Task ID: session-7 (continued, 07:15Z-11:25Z)
+Agent: main (Z.ai)
+
+Work Log:
+- RUNNER WINDOW-1 POSTMORTEM (run 40275193051, 05:37-10:53Z, 490
+  segments): 472 segments crashed at pc=0 in a loop. Root cause:
+  '[pakfs] disabled (ModuleNotFoundError: No module named Crypto)' -
+  the workflow pip line was missing pycryptodome, so the AES-decrypting
+  pakfs never engaged -> uproject wall -> engine exit -> pc=0. My poison
+  policy (refusing snap_crash for fetch faults) ALSO disarmed the
+  chain's crash-loop rollback (the no-snapshot branch reset the counter
+  every time) - a fix that created a worse bug.
+- FIXES (commit b6f3947+): pycryptodome added to workflow deps; both
+  chain scripts now fingerprint the fatal pc and roll back to snap_good
+  after 3-5 same-pc POISON crashes even without a crash snapshot
+  (CRASHPC_FILE defined in gha_chain.sh too).
+- KEY INSIGHT: the w1 state artifact is PRE-WALL (~40s before the
+  uproject open), not zombie - restoring it with working pakfs lets
+  the engine continue without a fresh boot. Runner re-dispatched with
+  state restore (fresh=false) as run 40314349069.
+- RUST: two more crates, all differential-green:
+  * fn35-printf: the fmt_engine port (35-case diff incl. %g dual-form
+    zero-strip, C exponent normalization, inf/nan, (null) %s, %@)
+  * fn35-paths: translate_path port (23-case diff incl. the
+    single-pass // collapse quirk that turns file:/// URLs into
+    relative System/ paths)
+  Workspace now: metal, metal-ffi, macho, pakfs, printf, paths.
+- LOCAL GRIND: MainAppThread in a long iterative remap-table grind
+  (0x90-stride child entries -> 0x80-stride table rows, hot loop
+  0x1009c5fe8-0x1009c6014, +~800M instr/segment, 6.6G -> 11.4G+);
+  pc cycles f94->fac->018 as the function is re-called per entry.
+  One abort() after an ObjC msgSend chain (recovered, no loop); one
+  pthread pc=0 null-call (poison rollback worked as designed).
+
+Stage Summary:
+- Runner: deps fixed + state restored; next milestones should flow
+- Local: deep in the post-LogInit table construction, progressing
+- Rust conversion: 6 crates, every one differential-verified
