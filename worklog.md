@@ -711,3 +711,41 @@ Stage Summary:
   valve fix; the abort-recovery + Metal-NOP make this phase robust
 - all fixes pushed: valve fresh-window, NSLog content, Metal-NOP,
   phys_pak dispatch input, forensics envs on the runner chain
+
+---
+Task ID: session-8 (continued, 05:30Z — marathon final stretch)
+
+Work Log:
+- RUNNER WINDOW-1 POSTMORTEM (run 40371425535, default mode, fresh):
+  didFinish (seg 2) -> 15-segment VM grind -> pak mount (seg 18) ->
+  24 segments SILENT grind (MainAppThread 29.3B) with a desync storm
+  (garbage-PC exec faults: 0xd400a981/b441, 0xa9be..., ~25% of
+  segments) and ZERO further milestones - the post-mount grind never
+  reached LogInit. Diagnosis: the auto CODE->BLOCK mid-boot swap
+  correlates with the storm
+- GH CHAIN FIX: FN35_SYNC_HOOK=block from segment 1 (matching the
+  local one_seg.sh which ran block-from-start all session with zero
+  init crashes)
+- WORKFLOW FILE WAS NEVER COMMITTED by git_save.sh (it stages only
+  scripts/ + worklog.md!) - the phys_pak input sat uncommitted; also
+  found+committed orphaned rust compute-extension files. LESSON:
+  git_save needs .github/ + rust/ in its add list
+- window-2 (inherited the doomed w1 state) cancelled; window-3
+  dispatched FRESH + phys_pak=true + BLOCK sync (23:19Z)
+- LOCAL PHYS CHAIN: passed the bSupportsOpenGLES2 Metal gate via the
+  abort-recovery path, now deep in the remap-table grind:
+  11.2B (first garbage-PC desync crash 0xd400a981 - same class as the
+  runner's; recovered via poison-rollback) -> 16.9B, ~260M/segment,
+  zero recurring crashes
+- hot-PC profile: ~22% in the accessor itself (0x1009c5f94..fbc +
+  epilogue 0x1009c6018/20), rest spread across per-entry callees -
+  pure guest computation, nothing host-side to optimize
+- the old segBU universe ground 6.6G->11.4G+ here and completed (then
+  crashed at IndexToObject, which our weak-guards now protect); w1's
+  29B grind is NOT comparable (desync-storm pathology)
+
+Stage Summary:
+- phys chain: 16.9B MainAppThread, healthy, milestones flowing until
+  the grind; the login screen is gated on this grind completing
+- runner w3: fresh phys replication, window ends ~04:44Z; w4 will
+  restore its state
