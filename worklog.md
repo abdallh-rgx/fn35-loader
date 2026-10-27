@@ -792,3 +792,51 @@ Stage Summary:
 - Local fresh universe grinding with pakfs ACTIVE from segment 1
 - Next milestones expected: init 773/773 -> didFinish -> pak mount ->
   LogInit -> device profiles -> the remap grind (11-15B est)
+
+---
+Task ID: session-9 (continued, 17:20Z-18:00Z)
+
+Work Log:
+- SANDBOX DISCOVERY: setsid/nohup/disown do NOT survive tool-session
+  end — ALL background daemons are reaped (tested empirically with a
+  survivor loop). The 1:1 link therefore runs PER-SEGMENT:
+  * one_seg.sh now ends every segment with git add -A + commit + push
+  * cron job 478173 (fixed_rate 600s, priority 10): every tick an
+    agent runs exactly one one_seg.sh segment (575s) then reports;
+    flock in one_seg.sh makes overlapping ticks skip safely
+  * manual: I also run segments directly between cron ticks
+- RUST fn35-cstr crate (#7, all #![forbid(unsafe_code)]):
+  * ports strlen/strnlen/strcmp/strncmp(N)/strcasecmp/strncasecmp/
+    strcpy/strncpy/strlcpy/strlcat/strcat/strstr/strchr/strrchr/
+    strchrnul/digit_val/strtol/strtod/atoi/atof + memcpy/memset/bzero/
+    memcmp + the chunked-256 gcstr reader
+  * 237-vector differential GREEN + 417-value python_float_str fuzz
+    GREEN (random f64 bit patterns vs CPython repr)
+  * REAL BUGS FOUND by the differential:
+    (1) Python _strlcat writes s[:room] AT DST+0 (overwrites from the
+        start, not append!) — latent loader bug, now documented+ported
+        1:1 (guest visible, engine tolerated it so far)
+    (2) strnlen can EXCEED maxlen when the NUL is inside the same
+        256-byte gcstr chunk (maxlen only bounds the loop) — quirk
+        preserved 1:1
+    (3) strtol "0x<end>" had an IndexError (st[i+2] OOB) — fixed
+        bounds-guard on the Python side, Rust mirrors it
+  * python_float_str: faithful CPython str(float) (shortest roundtrip,
+    decimal iff 1e-4<=|x|<1e16, 2-digit-min exponent) — powers the
+    strtod used=len(str(val)) quirk (e.g. "1e3"->consumed 6, ""->3)
+- LOCAL UNIVERSE (born 17:23:56Z after keystone cold-start): pakfs
+  ACTIVE from boot (3260 entries), 3+ segments clean (rc=0 budget,
+  no fatals), snapshot 136MB, data cells 27764 -> 43457 (real forward
+  progress), 12 task-graph workers ~820B virtual instr each (poll
+  parked), timer churn 28K (normal pattern). No LogInit prints yet —
+  the pre-LogInit grind (old universe took hours here).
+- Deps note: pip 'keystone' is a STUB (no Ks) — the real package is
+  'keystone-engine' (broke one resume; cold-started clean after fix).
+
+Stage Summary:
+- 1:1 GitHub mirror: autosync daemon dead (sandbox), replaced by
+  per-segment sync + cron-driven segments — progress lands on GitHub
+  every ~10 min from now on
+- Rust: 7 crates green (metal, metal-ffi, macho, pakfs, printf,
+  paths, cstr); clib str/conv surface fully differential-locked
+- Grind: healthy autonomous rhythm (cron+manual), awaiting LogInit
