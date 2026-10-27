@@ -1,0 +1,1032 @@
+     1→#!/usr/bin/env python3
+     2→"""FN3.5 loader: iOS-side services.
+     3→
+     4→Mach VM, pthread, GCD dispatch, TLS, ObjC/CF stubs, dyld services,
+     5→OpenGL ES / Metal trace layer, sysctl tables, and the native-callback
+     6→qsort. Registers implementations into fn35_clib.IMPL.
+     7→"""
+     8→import struct
+     9→
+    10→from fn35_clib import cfunc, IMPL, _to_int
+    11→
+    12→M64 = struct.Struct("<q")
+    13→
+    14→VM_FLAGS_ANYWHERE = 0x1
+    15→
+    16→# ---- data symbols bound as address cells (not function stubs) -------
+    17→DATA_SYMS = {
+    18→    "_stdout", "_stderr", "_stdin", "_environ", "___stack_chk_guard",
+    19→    "_mach_task_self_", "_stderrp", "_stdoutp", "_stdinp", "___progname",
+    20→}
+    21→
+    22→# ---- sysctl values (fake iPhone X / iOS 11.3 device) ------------------
+    23→SYSCTL_BY_NAME = {
+    24→    "hw.machine": b"iPhone10,4\x00",
+    25→    "hw.model": b"D221AP\x00",
+    26→    "hw.ncpu": 6,
+    27→    "hw.physicalcpu": 6,
+    28→    "hw.logicalcpu": 6,
+    29→    "hw.byteorder": 1234,
+    30→    "hw.pagesize": 16384,
+    31→    "hw.cachelinesize": 128,
+    32→    "hw.l1icachesize": 65536,
+    33→    "hw.l1dcachesize": 65536,
+    34→    "hw.l2cachesize": 2097152,
+    35→    "hw.l3cachesize": 0,
+    36→    "hw.memsize": 3221225472,          # 3 GB
+    37→    "hw.memsize_usable": 3221225472,
+    38→    "hw.cputype": 0x0100000C,          # ARM64
+    39→    "hw.cpusubtype": 0,
+    40→    "hw.cpusubtype64": 0,
+    41→    "hw.cpu64bit_capable": 1,
+    42→    "hw.tbfrequency": 24000000,
+    43→    "hw.vectorunit": 0,
+    44→    "hw.neon": 1,
+    45→    "hw.optional.armv8_1_atomics": 1,
+    46→    "hw.optional.floatingpoint": 1,
+    47→    "hw.optional.neon_fp16": 1,
+    48→    "hw.optional.neon_hp_arith": 1,
+    49→    "hw.optional.arc4rnd": 1,
+    50→    "kern.ostype": b"Darwin\x00",
+    51→    "kern.osrelease": b"17.5.0\x00",
+    52→    "kern.osversion": b"15E216\x00",
+    53→    "kern.osproductversion": b"11.3\x00",
+    54→    "kern.version": b"Darwin Kernel Version 17.5.0: Fri Mar 30 2018; fn35 synthetic\x00",
+    55→    "kern.bootargs": b"\x00",
+    56→    "kern.hostname": b"fn35\x00",
+    57→    "kern.maxproc": 1024,
+    58→    "kern.safeboot": 0,
+    59→    "kern.securelevel": 0,
+    60→    "kern.usrstack64": 0,
+    61→    "hw.optional.armv8_crc32": 1,
+    62→    "hw.optional.armv8_crypto": 1,
+    63→}
+    64→
+    65→_SYSCTL_TUPLE_NAMES = {
+    66→    (6, 1): "hw.machine", (6, 2): "hw.model", (6, 3): "hw.ncpu",
+    67→    (6, 4): "hw.byteorder", (6, 5): "hw.physmem", (6, 6): "hw.usermem",
+    68→    (6, 7): "hw.pagesize", (6, 10): "hw.cachelinesize",
+    69→    (6, 11): "hw.cachelinesize", (6, 24): "hw.memsize",
+    70→    (6, 25): "hw.memsize_usable", (6, 26): "hw.physicalcpu",
+    71→    (6, 27): "hw.logicalcpu", (6, 12): "hw.cputype",
+    72→    (6, 13): "hw.cpusubtype", (6, 30): "hw.cputype",
+    73→    (6, 100): "hw.optional.armv8_1_atomics",
+    74→    (1, 1): "kern.ostype", (1, 2): "kern.osrelease", (1, 3): "kern.osrev",
+    75→    (1, 4): "kern.version", (1, 65): "kern.osversion",
+    76→}
+    77→
+    78→
+    79→def sysctl_bytes(name):
+    80→    v = SYSCTL_BY_NAME.get(name)
+    81→    if v is None:
+    82→        return None
+    83→    if isinstance(v, int):
+    84→        if 0 <= v < 0x100000000:
+    85→            return struct.pack("<I", v)
+    86→        return struct.pack("<q", v)
+    87→    return v
+    88→
+    89→
+    90→# ====================================================================
+    91→# Mach VM + task
+    92→# ====================================================================
+    93→
+    94→@cfunc("_vm_allocate", "_mach_vm_allocate")
+    95→def _vm_allocate(l, task, out_addr, size, flags):
+    96→    addr = l.vm_alloc(size)
+    97→    if out_addr:
+    98→        l.w64(out_addr, addr)
+    99→    l.trace_mach("vm_allocate(size=0x%x, anywhere=%d) = 0x%x"
+   100→                 % (size, flags & 1, addr))
+   101→    return 0
+   102→
+   103→
+   104→@cfunc("_vm_deallocate", "_mach_vm_deallocate")
+   105→def _vm_deallocate(l, task, addr, size):
+   106→    l.trace_mach("vm_deallocate(0x%x, 0x%x) [noop]" % (addr, size))
+   107→    return 0
+   108→
+   109→
+   110→@cfunc("_vm_protect", "_mach_vm_protect", "_vm_remap", "_mach_vm_remap")
+   111→def _vm_protect(l, a=0, b=0, c=0, d=0, e=0, f=0, g=0):
+   112→    return 0
+   113→
+   114→
+   115→@cfunc("_vm_read", "_vm_read_overwrite", "_mach_vm_read_overwrite")
+   116→def _vm_read(l, task, addr, size, out, outcnt):
+   117→    l.wrb(out, l.rdb(addr, size))
+   118→    if outcnt:
+   119→        l.w64(outcnt, size)
+   120→    return 0
+   121→
+   122→
+   123→@cfunc("_vm_write", "_mach_vm_write")
+   124→def _vm_write(l, task, addr, data, size):
+   125→    l.wrb(addr, l.rdb(data, size))
+   126→    return 0
+   127→
+   128→
+   129→@cfunc("_vm_copy", "_mach_vm_copy")
+   130→def _vm_copy(l, task, src, size, dst):
+   131→    l.wrb(dst, l.rdb(src, size))
+   132→    return 0
+   133→
+   134→
+   135→@cfunc("_mach_task_self")
+   136→def _mach_task_self(l):
+   137→    return l.data_cell("_mach_task_self_")
+   138→
+   139→
+   140→@cfunc("_mach_thread_self")
+   141→def _mach_thread_self(l):
+   142→    return l.cur.tid
+   143→
+   144→
+   145→@cfunc("_host_info", "_host_info64")
+   146→def _host_info(l, host, flavor, out, count):
+   147→    return 0
+   148→
+   149→
+   150→@cfunc("_host_page_size")
+   151→def _host_page_size(l, host, out):
+   152→    l.w64(out, 16384)
+   153→    return 0
+   154→
+   155→
+   156→@cfunc("_mach_absolute_time")
+   157→def _mach_absolute_time(l):
+   158→    return l.vclock & 0xFFFFFFFFFFFFFFFF
+   159→
+   160→
+   161→@cfunc("_mach_continuous_time")
+   162→def _mach_continuous_time(l):
+   163→    return l.vclock & 0xFFFFFFFFFFFFFFFF
+   164→
+   165→
+   166→@cfunc("_mach_timebase_info")
+   167→def _mach_timebase_info(l, info):
+   168→    if info:
+   169→        l.w32(info, 1)
+   170→        l.w32(info + 4, 1)
+   171→    return 0
+   172→
+   173→
+   174→@cfunc("_mach_timebase_info_trap")
+   175→def _mach_timebase_info_trap(l, info):
+   176→    return _mach_timebase_info(l, info)
+   177→
+   178→
+   179→@cfunc("_mach_wait_until")
+   180→def _mach_wait_until(l, deadline):
+   181→    l.block_cur("sleep", None, wake_ns=_to_int(deadline), ret=0)
+   182→    return 0
+   183→
+   184→
+   185→# ====================================================================
+   186→# Mach semaphores
+   187→# ====================================================================
+   188→
+   189→@cfunc("_semaphore_create")
+   190→def _semaphore_create(l, task, out_sem, policy, value):
+   191→    h = l.data_cell("sem.%d" % (l.sem_seq), 64)
+   192→    l.sem_seq += 1
+   193→    l.sems[h] = {"count": value & 0xFFFFFFFF}
+   194→    if out_sem:
+   195→        l.w64(out_sem, h)
+   196→    return 0
+   197→
+   198→
+   199→@cfunc("_semaphore_destroy")
+   200→def _semaphore_destroy(l, task, sem):
+   201→    return 0
+   202→
+   203→
+   204→@cfunc("_semaphore_wait", "_semaphore_wait_signal")
+   205→def _semaphore_wait(l, sem):
+   206→    obj = l.sems.get(sem)
+   207→    if obj is None:
+   208→        l.warn("semaphore_wait on unknown 0x%x" % sem)
+   209→        return 0
+   210→    if obj["count"] > 0:
+   211→        obj["count"] -= 1
+   212→        return 0
+   213→    l.block_cur("sem", sem, ret=0)
+   214→    return 0
+   215→
+   216→
+   217→@cfunc("_semaphore_timedwait")
+   218→def _semaphore_timedwait(l, sem, deadline):
+   219→    obj = l.sems.get(sem)
+   220→    if obj and obj["count"] > 0:
+   221→        obj["count"] -= 1
+   222→        return 0
+   223→    l.block_cur("sem", sem, wake_ns=_to_int(deadline), ret=0)
+   224→    return 0
+   225→
+   226→
+   227→@cfunc("_semaphore_signal", "_semaphore_signal_all")
+   228→def _semaphore_signal(l, sem, *a):
+   229→    obj = l.sems.get(sem)
+   230→    if obj is None:
+   231→        return 0
+   232→    obj["count"] += 1
+   233→    l.wake("sem", sem, one=True)
+   234→    return 0
+   235→
+   236→
+   237→# ====================================================================
+   238→# pthread
+   239→# ====================================================================
+   240→
+   241→@cfunc("_pthread_create")
+   242→def _pthread_create(l, out_tid, attr, start, arg):
+   243→    if l.thread_count() >= 96:
+   244→        l.warn("pthread_create: thread cap hit, dropping thread")
+   245→        if out_tid:
+   246→            l.w64(out_tid, 0)
+   247→        return 0
+   248→    t = l.new_thread(start, arg, name="pthread")
+   249→    if out_tid:
+   250→        l.w64(out_tid, t.tid)
+   251→    l.trace_thread("pthread_create(start=0x%x arg=0x%x) tid=%d"
+   252→                   % (start, arg, t.tid))
+   253→    return 0
+   254→
+   255→
+   256→@cfunc("_pthread_exit")
+   257→def _pthread_exit(l, retval):
+   258→    l.cur.retval = retval
+   259→    l.thread_done(l.cur)
+   260→    return 0
+   261→
+   262→
+   263→@cfunc("_pthread_join")
+   264→def _pthread_join(l, tid, retval_ptr):
+   265→    t = l.threads.get(tid)
+   266→    if t is None:
+   267→        return 0
+   268→    if t.state == "done":
+   269→        if retval_ptr:
+   270→            l.w64(retval_ptr, t.retval or 0)
+   271→        return 0
+   272→    l.block_cur("join", tid, extra=retval_ptr, ret=0)
+   273→    return 0
+   274→
+   275→
+   276→@cfunc("_pthread_timedjoin_np")
+   277→def _pthread_timedjoin(l, tid, retval_ptr, abstime):
+   278→    return _pthread_join(l, tid, retval_ptr)
+   279→
+   280→
+   281→@cfunc("_pthread_detach", "_pthread_attr_init", "_pthread_attr_destroy",
+   282→       "_pthread_attr_setdetachstate", "_pthread_attr_setstacksize",
+   283→       "_pthread_attr_getstacksize", "_pthread_attr_setschedparam",
+   284→       "_pthread_attr_getschedparam", "_pthread_attr_setinheritsched",
+   285→       "_pthread_attr_setscope", "_pthread_attr_setguardsize",
+   286→       "_pthread_getattr_default_np", "_pthread_setattr_default_np",
+   287→       "_pthread_setname_np", "_pthread_cancel", "_pthread_kill",
+   288→       "_pthread_cleanup_push", "_pthread_cleanup_pop",
+   289→       "_pthread_sigmask", "_pthread_mach_thread_np",
+   290→       "_pthread_threadid_np", "_pthread_testcancel")
+   291→def _pthread_stub(l, a=0, b=0, c=0, d=0):
+   292→    return 0
+   293→
+   294→
+   295→@cfunc("_pthread_self")
+   296→def _pthread_self(l):
+   297→    return l.cur.tid
+   298→
+   299→
+   300→@cfunc("_pthread_is_threaded_np")
+   301→def _pthread_is_threaded_np(l):
+   302→    return 1
+   303→
+   304→
+   305→@cfunc("_pthread_main_np")
+   306→def _pthread_main_np(l):
+   307→    return 1 if l.cur.name == "main" else 0
+   308→
+   309→
+   310→@cfunc("_pthread_mutex_init", "_pthread_mutexattr_init",
+   311→       "_pthread_mutexattr_destroy", "_pthread_mutexattr_settype",
+   312→       "_pthread_mutexattr_setpshared", "_pthread_mutexattr_setpolicy")
+   313→def _pthread_stub2(l, a=0, b=0, c=0):
+   314→    return 0
+   315→
+   316→
+   317→@cfunc("_pthread_mutex_destroy", "_pthread_cond_destroy")
+   318→def _pthread_stub3(l, a=0):
+   319→    return 0
+   320→
+   321→
+   322→def _mutex(l, m):
+   323→    st = l.mutexes.get(m)
+   324→    if st is None:
+   325→        st = l.mutexes[m] = {"owner": None, "count": 0}
+   326→    return st
+   327→
+   328→
+   329→@cfunc("_pthread_mutex_lock", "_pthread_mutex_lock_slow")
+   330→def _pthread_mutex_lock(l, m):
+   331→    st = _mutex(l, m)
+   332→    if st["owner"] is None or st["owner"] == l.cur:
+   333→        st["owner"] = l.cur
+   334→        st["count"] += 1
+   335→        return 0
+   336→    l.block_cur("mutex", m, ret=0)
+   337→    return 0
+   338→
+   339→
+   340→@cfunc("_pthread_mutex_unlock", "_pthread_mutex_unlock_slow")
+   341→def _pthread_mutex_unlock(l, m):
+   342→    st = _mutex(l, m)
+   343→    st["count"] -= 1
+   344→    if st["count"] <= 0:
+   345→        st["count"] = 0
+   346→        st["owner"] = None
+   347→        l.wake("mutex", m, one=True)
+   348→    return 0
+   349→
+   350→
+   351→@cfunc("_pthread_mutex_trylock")
+   352→def _pthread_mutex_trylock(l, m):
+   353→    st = _mutex(l, m)
+   354→    if st["owner"] is None or st["owner"] == l.cur:
+   355→        st["owner"] = l.cur
+   356→        st["count"] += 1
+   357→        return 0
+   358→    return 16  # EBUSY
+   359→
+   360→
+   361→@cfunc("_pthread_cond_init", "_pthread_condattr_init")
+   362→def _cond_stub(l, a=0, b=0):
+   363→    return 0
+   364→
+   365→
+   366→@cfunc("_pthread_cond_wait")
+   367→def _pthread_cond_wait(l, cond, m):
+   368→    # unlock, sleep on cond, relock on wake
+   369→    st = _mutex(l, m)
+   370→    st["count"] = 0
+   371→    st["owner"] = None
+   372→    l.wake("mutex", m, one=True)
+   373→    l.block_cur("cond", cond, extra=m, ret=0)
+   374→    return 0
+   375→
+   376→
+   377→@cfunc("_pthread_cond_timedwait")
+   378→def _pthread_cond_timedwait(l, cond, m, abstime):
+   379→    st = _mutex(l, m)
+   380→    st["count"] = 0
+   381→    st["owner"] = None
+   382→    l.wake("mutex", m, one=True)
+   383→    l.block_cur("cond", cond, extra=m, wake_ns=l.deadline_to_ns(abstime),
+   384→                ret=0)
+   385→    return 0
+   386→
+   387→
+   388→@cfunc("_pthread_cond_signal")
+   389→def _pthread_cond_signal(l, cond):
+   390→    l.wake("cond", cond, one=True)
+   391→    return 0
+   392→
+   393→
+   394→@cfunc("_pthread_cond_broadcast")
+   395→def _pthread_cond_broadcast(l, cond):
+   396→    l.wake("cond", cond, one=False)
+   397→    return 0
+   398→
+   399→
+   400→@cfunc("_pthread_once")
+   401→def _pthread_once(l, ctrl, routine):
+   402→    if l.rd64(ctrl) == 0:
+   403→        l.w64(ctrl, 1)
+   404→        def drv():
+   405→            yield ("call", routine, ())
+   406→        l.py_call(drv(), ret=0)
+   407→    return 0
+   408→
+   409→
+   410→@cfunc("_pthread_key_create")
+   411→def _pthread_key_create(l, out_key, dtor):
+   412→    k = l.tls_seq
+   413→    l.tls_seq += 1
+   414→    if out_key:
+   415→        l.w32(out_key, k)
+   416→    return 0
+   417→
+   418→
+   419→@cfunc("_pthread_key_delete")
+   420→def _pthread_key_delete(l, key):
+   421→    return 0
+   422→
+   423→
+   424→@cfunc("_pthread_getspecific")
+   425→def _pthread_getspecific(l, key):
+   426→    return l.cur.specific.get(key, 0)
+   427→
+   428→
+   429→@cfunc("_pthread_setspecific")
+   430→def _pthread_setspecific(l, key, val):
+   431→    l.cur.specific[key] = val
+   432→    return 0
+   433→
+   434→
+   435→# ====================================================================
+   436→# GCD dispatch
+   437→# ====================================================================
+   438→
+   439→@cfunc("_dispatch_async")
+   440→def _dispatch_async(l, q, block):
+   441→    invoke = l.rd64(block + 16)
+   442→    t = l.new_thread(invoke, block, name="dispatch_async")
+   443→    l.trace_thread("dispatch_async(q=0x%x block=0x%x) -> tid %d"
+   444→                   % (q, block, t.tid))
+   445→    return 0
+   446→
+   447→
+   448→@cfunc("_dispatch_async_f")
+   449→def _dispatch_async_f(l, q, ctx, fn):
+   450→    t = l.new_thread(fn, ctx, name="dispatch_async_f")
+   451→    return 0
+   452→
+   453→
+   454→@cfunc("_dispatch_sync_f")
+   455→def _dispatch_sync_f(l, q, ctx, fn):
+   456→    def drv():
+   457→        yield ("call", fn, (ctx,))
+   458→    l.py_call(drv(), ret=0)
+   459→    return 0
+   460→
+   461→
+   462→@cfunc("_dispatch_after")
+   463→def _dispatch_after(l, when, q, block):
+   464→    invoke = l.rd64(block + 16)
+   465→    l.new_thread(invoke, block, name="dispatch_after")
+   466→    return 0
+   467→
+   468→
+   469→@cfunc("_dispatch_after_f")
+   470→def _dispatch_after_f(l, when, q, ctx, fn):
+   471→    l.new_thread(fn, ctx, name="dispatch_after_f")
+   472→    return 0
+   473→
+   474→
+   475→@cfunc("_dispatch_once", "_dispatch_once_f")
+   476→def _dispatch_once(l, ptr, a=0):
+   477→    if l.rd64(ptr) == 0:
+   478→        l.w64(ptr, -1 & 0xFFFFFFFFFFFFFFFF)
+   479→        if a:
+   480→            def drv():
+   481→                yield ("call", a, ())
+   482→            l.py_call(drv(), ret=0)
+   483→    return 0
+   484→
+   485→
+   486→@cfunc("_dispatch_get_main_queue")
+   487→def _dispatch_get_main_queue(l):
+   488→    return l.data_cell("q.main")
+   489→
+   490→
+   491→@cfunc("_dispatch_get_global_queue")
+   492→def _dispatch_get_global_queue(l, prio, flags):
+   493→    return l.data_cell("q.global")
+   494→
+   495→
+   496→@cfunc("_dispatch_queue_create")
+   497→def _dispatch_queue_create(l, label, attr):
+   498→    return l.data_cell("q.%s" % (l.gcstr(label) if label else "?"))
+   499→
+   500→
+   501→@cfunc("_dispatch_retain", "_dispatch_release", "_dispatch_suspend",
+   502→       "_dispatch_resume", "_dispatch_set_target_queue",
+   503→       "_dispatch_set_finalizer_f", "_dispatch_async_and_wait_f",
+   504→       "_dispatch_barrier_async_f", "_dispatch_group_async_f")
+   505→def _dispatch_stub(l, a=0, b=0, c=0):
+   506→    return 0
+   507→
+   508→
+   509→@cfunc("_dispatch_main")
+   510→def _dispatch_main(l):
+   511→    l.console("dispatch_main() -- parking main thread")
+   512→    l.block_cur("forever", "dispatch_main", ret=0)
+   513→    return 0
+   514→
+   515→
+   516→@cfunc("_dispatch_group_create")
+   517→def _dispatch_group_create(l):
+   518→    return l.data_cell("group")
+   519→
+   520→
+   521→@cfunc("_dispatch_group_wait")
+   522→def _dispatch_group_wait(l, g, timeout):
+   523→    return 0
+   524→
+   525→
+   526→@cfunc("_dispatch_semaphore_create")
+   527→def _dispatch_semaphore_create(l, value):
+   528→    h = l.data_cell("dsem.%d" % l.sem_seq, 64)
+   529→    l.sem_seq += 1
+   530→    l.sems[h] = {"count": value & 0xFFFFFFFF}
+   531→    return h
+   532→
+   533→
+   534→@cfunc("_dispatch_semaphore_wait")
+   535→def _dispatch_semaphore_wait(l, sem, timeout):
+   536→    return _cfunc_sem_wait(l, sem)
+   537→
+   538→
+   539→def _cfunc_sem_wait(l, sem):
+   540→    obj = l.sems.get(sem)
+   541→    if obj and obj["count"] > 0:
+   542→        obj["count"] -= 1
+   543→        return 0
+   544→    l.block_cur("sem", sem, ret=0)
+   545→    return 0
+   546→
+   547→
+   548→@cfunc("_dispatch_semaphore_signal")
+   549→def _dispatch_semaphore_signal(l, sem):
+   550→    obj = l.sems.get(sem)
+   551→    if obj:
+   552→        obj["count"] += 1
+   553→    l.wake("sem", sem, one=True)
+   554→    return 0
+   555→
+   556→
+   557→# ====================================================================
+   558→# TLS (thread-local variables)
+   559→# ====================================================================
+   560→
+   561→@cfunc("__tlv_get_addr", "_tlv_bootstrap")
+   562→def _tlv_get_addr(l, desc):
+   563→    key = l.rd64(desc + 8)
+   564→    if key == 0:
+   565→        key = desc
+   566→        l.w64(desc + 8, key)
+   567→    offset = l.rd64(desc + 16)
+   568→    t = l.cur
+   569→    base = t.tlv_bases.get(key)
+   570→    if base is None:
+   571→        tlv_base, tlv_size = l.tlv_template
+   572→        base = l.heap_alloc(max(tlv_size, 16), zero=True)
+   573→        if tlv_base and tlv_size:
+   574→            try:
+   575→                l.wrb(base, l.rdb(tlv_base, tlv_size))
+   576→            except Exception:
+   577→                pass
+   578→        t.tlv_bases[key] = base
+   579→        l.trace_mach("tlv: thread %d new block 0x%x (tmpl 0x%x +0x%x)"
+   580→                     % (t.tid, base, tlv_base, tlv_size))
+   581→    return base + offset
+   582→
+   583→
+   584→# ====================================================================
+   585→# dyld services
+   586→# ====================================================================
+   587→
+   588→@cfunc("_NSGetExecutablePath")
+   589→def _nsgetexecpath(l, buf, buflen):
+   590→    p = l.exe_path.encode() + b"\x00"
+   591→    need = len(p)
+   592→    cur = l.rd32(buflen)
+   593→    if buf and cur >= need:
+   594→        l.wrb(buf, p)
+   595→        l.w32(buflen, need)
+   596→        return 0
+   597→    l.w32(buflen, need)
+   598→    return 34  # ERANGE
+   599→
+   600→
+   601→@cfunc("_dyld_image_count")
+   602→def _dyld_image_count(l):
+   603→    return 1
+   604→
+   605→
+   606→@cfunc("_dyld_get_image_name")
+   607→def _dyld_get_image_name(l, idx):
+   608→    return l.cstring_cell("image.name", l.exe_path) if idx == 0 else 0
+   609→
+   610→
+   611→@cfunc("_dyld_get_image_header")
+   612→def _dyld_get_image_header(l, idx):
+   613→    return l.macho.text_vm() if idx == 0 else 0
+   614→
+   615→
+   616→@cfunc("_dyld_get_image_vmaddr_slide")
+   617→def _dyld_get_image_vmaddr_slide(l, idx):
+   618→    return 0
+   619→
+   620→
+   621→@cfunc("_dyld_register_func_add_remove_image", "_dyld_register_func_late",
+   622→       "_dyld_register_thread_helpers", "__dyld_register_func_lookup")
+   623→def _dyld_stub(l, a=0, b=0):
+   624→    return 0
+   625→
+   626→
+   627→@cfunc("_dlopen")
+   628→def _dlopen(l, path, mode):
+   629→    return l.data_cell("dl.handle")
+   630→
+   631→
+   632→@cfunc("_dlsym")
+   633→def _dlsym(l, handle, name):
+   634→    return l.get_stub(l.gcstr(name))
+   635→
+   636→
+   637→@cfunc("_dladdr")
+   638→def _dladdr(l, addr, info):
+   639→    if info:
+   640→        l.w64(info + 0, l.macho.text_vm())
+   641→        l.w64(info + 8, l.cstring_cell("dl.fname", l.exe_path))
+   642→        name, saddr = l.nearest_symbol(addr)
+   643→        l.w64(info + 16, l.cstring_cell("dl.sname", name) if name else 0)
+   644→        l.w64(info + 24, saddr or 0)
+   645→    return 1
+   646→
+   647→
+   648→@cfunc("_getsectdata", "_getsectiondata", "_getsegmentdata")
+   649→def _getsectdata(l, seg, sect, out_size):
+   650→    sn = l.gcstr(seg, maxlen=16)
+   651→    cn = l.gcstr(sect, maxlen=16)
+   652→    for s in l.macho.sections:
+   653→        if s.seg == sn and s.name == cn:
+   654→            if out_size:
+   655→                l.w64(out_size, s.size)
+   656→            return s.addr
+   657→    if out_size:
+   658→        l.w64(out_size, 0)
+   659→    return 0
+   660→
+   661→
+   662→# ====================================================================
+   663→# ObjC / CoreFoundation (trace-grade stubs)
+   664→# ====================================================================
+   665→
+   666→@cfunc("_objc_msgSend", "_objc_msgSendSuper", "_objc_msgSend_stret")
+   667→def _objc_msgsend(l, recv, sel):
+   668→    s = l.gcstr(sel) if sel else "?"
+   669→    l.trace_objc("%s obj=0x%x sel=%s" % ("msgSend", recv, s))
+   670→    return 0
+   671→
+   672→
+   673→@cfunc("_objc_getClass", "_objc_lookUpClass", "_objc_getRequiredClass",
+   674→       "_objc_allocateClassPair")
+   675→def _objc_getclass(l, name):
+   676→    n = l.gcstr(name) if name else "?"
+   677→    l.trace_objc("getClass(%s) -> nil" % n)
+   678→    return 0
+   679→
+   680→
+   681→@cfunc("_objc_registerClassPair", "_objc_disposeClassPair",
+   682→       "_objc_setAssociatedObject", "_objc_setProperty",
+   683→       "_objc_getProperty", "_objc_copyClassList", "_objc_getClassList",
+   684→       "_objc_getMetaClass", "_objc_getProtocol",
+   685→       "_objc_copyProtocolList", "_objc_addProtocol",
+   686→       "_class_getName", "_class_getInstanceSize", "_class_getSuperclass",
+   687→       "_class_respondsToSelector", "_class_createInstance",
+   688→       "_class_addMethod", "_class_addIvar", "_class_addProtocol",
+   689→       "_object_getClass", "_object_setClass", "_object_getIvar",
+   690→       "_object_setIvar", "_method_getName", "_method_getImplementation",
+   691→       "_method_setImplementation", "_sel_isEqual", "_sel_getName",
+   692→       "_objc_enumerationMutation", "_objc_autorelease",
+   693→       "_objc_autoreleasePoolPush", "_objc_autoreleasePoolPop",
+   694→       "_objc_retain", "_objc_retainAutorelease",
+   695→       "_objc_retainAutoreleasedReturnValue",
+   696→       "_objc_storeStrong", "_objc_release", "_objc_terminate",
+   697→       "_objc_sync_enter", "_objc_sync_exit", "_objc_copyClassList",
+   698→       "_objc_getClassList", "_objc_msgSendSuper2",
+   699→       "_objc_beginMessage", "_objc_endMessage")
+   700→def _objc_stub(l, a=0, b=0, c=0, d=0):
+   701→    return 0
+   702→
+   703→
+   704→@cfunc("_sel_registerName")
+   705→def _sel_registername(l, name):
+   706→    return l.cstring_cell("sel." + (l.gcstr(name) if name else ""))
+   707→
+   708→
+   709→@cfunc("_CFStringCreateWithCString", "_CFStringCreateWithCStringNoCopy",
+   710→       "_CFStringCreateMutable", "_CFStringCreateCopy")
+   711→def _cf_str_create(l, alloc, *a):
+   712→    h = l.data_cell("cfstr.%d" % l.cf_seq, 64)
+   713→    l.cf_seq += 1
+   714→    return h
+   715→
+   716→
+   717→@cfunc("_CFStringGetCString")
+   718→def _CFStringGetCString(l, s, buf, size, enc):
+   719→    return 0
+   720→
+   721→
+   722→@cfunc("_CFStringGetCStringPtr")
+   723→def _CFStringGetCStringPtr(l, s, enc):
+   724→    return 0
+   725→
+   726→
+   727→@cfunc("_CFStringCreateWithFormat")
+   728→def _CFStringCreateWithFormat(l, alloc, opts, fmt):
+   729→    return l.data_cell("cfstr.%d" % l.cf_seq, 64)
+   730→
+   731→
+   732→@cfunc("_CFAbsoluteTimeGetCurrent")
+   733→def _cfabs_time(l):
+   734→    return ("d0", l.vclock / 1e9)
+   735→
+   736→
+   737→@cfunc("_CFBundleGetMainBundle")
+   738→def _cfbundle(l):
+   739→    return l.data_cell("cfbundle.main")
+   740→
+   741→
+   742→@cfunc("_CFBundleCopyBundleURL", "_CFBundleCopyResourcesDirectoryURL",
+   743→       "_CFBundleGetValueForInfoDictionaryKey")
+   744→def _cfbundle2(l, a=0, b=0):
+   745→    return 0
+   746→
+   747→
+   748→@cfunc("_CFRelease", "_CFRetain", "_CFShow", "_CFAutorelease")
+   749→def _cf_stub(l, a=0):
+   750→    return 0
+   751→
+   752→
+   753→@cfunc("_CFUUIDCreate", "_CFUUIDCreateString")
+   754→def _cfuuid(l, a=0, b=0):
+   755→    return l.data_cell("cfuuid.%d" % l.cf_seq, 64)
+   756→
+   757→
+   758→@cfunc("_CFNumberCreate")
+   759→def _cfnumber(l, alloc, theType, valuePtr):
+   760→    return l.data_cell("cfnum.%d" % l.cf_seq, 64)
+   761→
+   762→
+   763→@cfunc("_CFDictionaryCreate", "_CFDictionaryCreateMutable",
+   764→       "_CFDictionaryCreateCopy", "_CFArrayCreateMutable",
+   765→       "_CFArrayCreate", "_CFSetCreateMutable")
+   766→def _cfcoll(l, *a):
+   767→    return l.data_cell("cfcoll.%d" % l.cf_seq, 64)
+   768→
+   769→
+   770→@cfunc("_CFDictionaryGetValue", "_CFDictionaryAddValue",
+   771→       "_CFDictionarySetValue", "_CFArrayGetValueAtIndex",
+   772→       "_CFArrayAppendValue", "_CFArrayGetCount", "_CFDictionaryGetCount")
+   773→def _cf_value(l, *a):
+   774→    return 0
+   775→
+   776→
+   777→@cfunc("_CFNotificationCenterGetLocalCenter",
+   778→       "_CFNotificationCenterGetDistributedCenter")
+   779→def _cfnc(l):
+   780→    return l.data_cell("cfnc")
+   781→
+   782→
+   783→# ====================================================================
+   784→# OpenGL ES / Metal trace layer
+   785→# ====================================================================
+   786→
+   787→def _gl(l, name, x0=0, x1=0, x2=0, x3=0, x4=0, x5=0, x6=0, x7=0):
+   788→    l.trace_gl(name, (x0, x1, x2, x3, x4, x5, x6, x7))
+   789→    return 0
+   790→
+   791→
+   792→def _reg_gl():
+   793→    names = [
+   794→        "glClearColor", "glClear", "glClearDepthf", "glViewport",
+   795→        "glCreateShader", "glShaderSource", "glCompileShader",
+   796→        "glGetShaderiv", "glGetShaderInfoLog", "glDeleteShader",
+   797→        "glCreateProgram", "glAttachShader", "glLinkProgram",
+   798→        "glGetProgramiv", "glGetProgramInfoLog", "glDeleteProgram",
+   799→        "glUseProgram", "glGenBuffers", "glBindBuffer", "glBufferData",
+   800→        "glBufferSubData", "glDeleteBuffers", "glMapBufferRange",
+   801→        "glUnmapBuffer", "glGenVertexArrays", "glBindVertexArray",
+   802→        "glVertexAttribPointer", "glEnableVertexAttribArray",
+   803→        "glDisableVertexAttribArray", "glDrawArrays", "glDrawElements",
+   804→        "glEnable", "glDisable", "glBlendFunc", "glDepthFunc",
+   805→        "glCullFace", "glFrontFace", "glFinish", "glFlush",
+   806→        "glGetString", "glGetIntegerv", "glPixelStorei", "glReadPixels",
+   807→        "glGenTextures", "glBindTexture", "glTexImage2D",
+   808→        "glTexSubImage2D", "glTexParameteri", "glDeleteTextures",
+   809→        "glActiveTexture", "glGenFramebuffers", "glBindFramebuffer",
+   810→        "glFramebufferTexture2D", "glCheckFramebufferStatus",
+   811→        "glDeleteFramebuffers", "glGenRenderbuffers",
+   812→        "glBindRenderbuffer", "glRenderbufferStorage",
+   813→        "glFramebufferRenderbuffer", "glDeleteRenderbuffers",
+   814→        "glUniform1f", "glUniform2f", "glUniform3f", "glUniform4f",
+   815→        "glUniform1i", "glUniformMatrix4fv", "glGetUniformLocation",
+   816→        "glGetAttribLocation", "glScissor", "glStencilFunc",
+   817→        "glColorMask", "glDepthMask", "glLineWidth", "glPolygonOffset",
+   818→        "glGenerateMipmap", "glGetError", "glIsEnabled", "glGetStringi",
+   819→        "glInvalidateFramebuffer", "glDispatchCompute",
+   820→        "glBindBufferBase", "glUniformBlockBinding", "glFenceSync",
+   821→        "glClientWaitSync", "glDeleteSync", "glBlitFramebuffer",
+   822→    ]
+   823→    for n in names:
+   824→        IMPL["_" + n] = (lambda nm: (lambda l, *a: _gl(l, nm, *a)))(n)
+   825→
+   826→
+   827→_reg_gl()
+   828→
+   829→
+   830→@cfunc("_glGetError")
+   831→def _glGetError(l):
+   832→    return 0  # GL_NO_ERROR
+   833→
+   834→
+   835→@cfunc("_glGetString", "_glGetStringi")
+   836→def _glGetString(l, name, index=0):
+   837→    vals = {
+   838→        0x1F00: "", 0x1F01: "Apple Software Renderer (fn35)",
+   839→        0x1F02: "OpenGL ES 3.0 fn35", 0x1F03: "fn35",
+   840→        0x8B8C: "OpenGL ES GLSL ES 3.00 fn35",
+   841→    }
+   842→    return l.cstring_cell("glstr", vals.get(name, ""))
+   843→
+   844→
+   845→@cfunc("_glGetStringi")
+   846→def _glGetStringi(l, name, index):
+   847→    return l.cstring_cell("glstr", "")
+   848→
+   849→
+   850→@cfunc("_MTLCreateSystemDefaultDevice")
+   851→def _mtl_device(l):
+   852→    l.trace_gl("MTLCreateSystemDefaultDevice", (0,))
+   853→    return 0  # nil device -> UE4 logs failure
+   854→
+   855→
+   856→# ====================================================================
+   857→# native-callback qsort
+   858→# ====================================================================
+   859→
+   860→def _qsort_native(l, base, n, size, compar):
+   861→    def drv():
+   862→        arr = [base + i * size for i in range(_to_int(n))]
+   863→        for i in range(1, len(arr)):
+   864→            j = i
+   865→            while j > 0:
+   866→                r = yield ("call", compar, (arr[j - 1], arr[j]))
+   867→                if r <= 0:
+   868→                    break
+   869→                a1 = l.rdb(arr[j - 1], size)
+   870→                a2 = l.rdb(arr[j], size)
+   871→                l.wrb(arr[j - 1], a2)
+   872→                l.wrb(arr[j], a1)
+   873→                arr[j - 1], arr[j] = base + (j - 1) * size, base + j * size
+   874→                j -= 1
+   875→
+   876→    l.py_call(drv(), ret=0)
+   877→    return 0
+   878→
+   879→
+   880→# ====================================================================
+   881→# kernel-ish imports discovered during boot (added iteratively)
+   882→# ====================================================================
+   883→
+   884→@cfunc("_mach_host_self")
+   885→def _mach_host_self(l):
+   886→    return l.data_cell("mach.host_self", 64)
+   887→
+   888→
+   889→@cfunc("_host_statistics", "_host_statistics64", "_host_processor_info")
+   890→def _host_statistics(l, host, flavor, info, count):
+   891→    # flavor 2 = HOST_BASIC_INFO; fill a real struct (drives UE4's
+   892→    # memory model and page-size computations)
+   893→    try:
+   894→        if flavor == 2 and info:
+   895→            # NOTE: UE4's FMallocBinned2 pool sizing derives from
+   896→            # max_cpus * PageSize; needs >= 8 MB to build a real hash
+   897→            # table. Core counts used by the engine itself come from
+   898→            # sysctl(hw.ncpu) instead, so this stays a boot parameter.
+   899→            data = struct.pack(
+   900→                "<iiIiiiiiiI Q",
+   901→                512,            # max_cpus (pool sizing)
+   902→                512,            # avail_cpus
+   903→                0xC0000000,     # memory_size (3 GB)
+   904→                0x0100000C,     # cpu_type (ARM64)
+   905→                0,              # cpu_subtype
+   906→                0,              # thread_toggle
+   907→                6,              # physical_cpu
+   908→                6,              # physical_cpu_max
+   909→                6,              # logical_cpu
+   910→                6,              # logical_cpu_max
+   911→                3221225472)     # max_mem
+   912→            l.wrb(info, data)
+   913→            if count:
+   914→                l.w32(count, 11)     # HOST_BASIC_INFO_COUNT
+   915→        elif flavor == 1 and info:  # HOST_LOAD_INFO
+   916→            data = struct.pack("<iiiiii", 1024, 512, 0, 0, 0, 0)
+   917→            l.wrb(info, data)
+   918→            if count:
+   919→                l.w32(count, 6)
+   920→    except Exception:
+   921→        pass
+   922→    if count and flavor not in (1, 2):
+   923→        l.w32(count, 8)
+   924→    return 0
+   925→
+   926→
+   927→@cfunc("_task_info")
+   928→def _task_info_fn(l, task, flavor, info, count):
+   929→    # flavor 20 = MACH_TASK_BASIC_INFO: virtual/resident sizes drive
+   930→    # UE4's FMallocBinned2 configuration
+   931→    import os as _os
+   932→    if _os.environ.get("FN35_DEBUG_HOOKS"):
+   933→        try:
+   934→            slot_v = l.rd64(0x1037c1bd8)
+   935→            cell_v = l.rd64(slot_v) if slot_v else -1
+   936→            l.console("[dbg] task_info(task=0x%x flavor=%d info=0x%x cnt=0x%x "
+   937→                      "| GOT[0x1037c1bd8]=0x%x -> [x8]=0x%x)"
+   938→                      % (task, flavor, info, count, slot_v, cell_v))
+   939→        except Exception as e:
+   940→            l.console("[dbg] task_info dbg failed %r" % (e,))
+   941→    try:
+   942→        if flavor == 20 and info:
+   943→            data = struct.pack(
+   944→                "<QQii" + "q" * 6,
+   945→                0xC0000000,     # virtual_size (3 GB)
+   946→                0x28000000,     # resident_size (640 MB)
+   947→                0, 0,
+   948→                0, 0, 0, 0, 0, 0)
+   949→            l.wrb(info, data)
+   950→            if count:
+   951→                l.w32(count, 12)
+   952→        elif flavor == 5 and info:   # TASK_BASIC_INFO
+   953→            data = struct.pack("<QQiiiQQi", 0xC0000000, 0x28000000,
+   954→                               0, 0, 0, 0, 0, 0)
+   955→            l.wrb(info, data)
+   956→            if count:
+   957→                l.w32(count, 10)
+   958→        elif flavor == 22 and info:  # TASK_VM_INFO (subset)
+   959→            data = struct.pack("<" + "Q" * 12)
+   960→            l.wrb(info, data[:96])
+   961→            if count:
+   962→                l.w32(count, 24)
+   963→    except Exception:
+   964→        pass
+   965→    return 0
+   966→
+   967→
+   968→@cfunc("_sysctl")
+   969→def _sysctl_fn(l, namep, count, oldp, oldlenp, newp=0, newlen=0):
+   970→    return l.sys_sysctl(namep, count, oldp, oldlenp)
+   971→
+   972→
+   973→@cfunc("_sysctlbyname")
+   974→def _sysctlbyname_fn(l, name, oldp, oldlenp, newp=0, newlen=0):
+   975→    return l.sys_sysctlbyname(l.gcstr(name), oldp, oldlenp)
+   976→
+   977→
+   978→@cfunc("_mmap")
+   979→def _mmap_fn(l, addr, length, prot, flags, fd, offset):
+   980→    return l.mmap_alloc(length)
+   981→
+   982→
+   983→@cfunc("_munmap", "_msync", "_madvise", "_mlock", "_munlock", "_mprotect")
+   984→def _mm_stub(l, a=0, b=0, c=0, d=0):
+   985→    return 0
+   986→
+   987→
+   988→@cfunc("_abort")
+   989→def _abort_fn(l):
+   990→    pc = l.reg_pc()
+   991→    name, saddr = l.nearest_symbol(pc)
+   992→    l.fatal("abort() at %s+0x%x" % (name or "?", pc - (saddr or 0)))
+   993→    return 0
+   994→
+   995→
+   996→@cfunc("___assert_rtn", "___assert_fail")
+   997→def _assert_rtn(l, func, file, line, expr):
+   998→    try:
+   999→        fn = l.gcstr(func) if func else "?"
+  1000→        fl = l.gcstr(file) if file else "?"
+  1001→        ex = l.gcstr(expr) if expr else "?"
+  1002→    except Exception:
+  1003→        fn = fl = ex = "?"
+  1004→    l.fatal("assert(%s) in %s at %s:%d"
+  1005→            % (ex, fn, fl, line & 0xFFFFFFFF))
+  1006→    return 0
+  1007→
+  1008→
+  1009→@cfunc("___stack_chk_fail")
+  1010→def _stack_chk_fail(l):
+  1011→    l.fatal("__stack_chk_fail: stack canary smashed")
+  1012→    return 0
+  1013→
+  1014→
+  1015→@cfunc("___cxa_throw", "___cxa_rethrow")
+  1016→def _cxa_throw(l, obj, typeinfo, dest):
+  1017→    pc = l.reg_pc()
+  1018→    name, saddr = l.nearest_symbol(pc)
+  1019→    l.fatal("C++ exception thrown at %s+0x%x (obj=0x%x)"
+  1020→            % (name or "?", pc - (saddr or 0), obj))
+  1021→    return 0
+  1022→
+  1023→
+  1024→@cfunc("___cxa_allocate_exception")
+  1025→def _cxa_alloc_exc(l, size):
+  1026→    return l.heap_alloc(size)
+  1027→
+  1028→
+  1029→@cfunc("___cxa_free_exception")
+  1030→def _cxa_free_exc(l, ptr):
+  1031→    return 0
+  1032→

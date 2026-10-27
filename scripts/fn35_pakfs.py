@@ -38,27 +38,42 @@ def find_pak(app_dir):
     The IPA stores lowercase 'cookeddata/fortnitegame/content/paks/...' while
     the canonical UE layout is 'Content/Paks'; host extraction may yield
     either case (Linux is case-sensitive), so probe both + a glob fallback.
+
+    FIX (2026-10-28): when BOTH case-variants of a directory exist on disk
+    (e.g. 'FortniteGame/' empty alongside 'fortnitegame/' holding the pak),
+    the old single-pass walk took listdir()[0] and could descend into the
+    WRONG twin. Now a DFS tries every case-variant branch, preferring the
+    branch that actually reaches the .pak file.
     """
     rel = ["cookeddata", "fortnitegame", "Content", "Paks",
            "pakchunkearly-iosclient.pak"]
     cand = os.path.join(app_dir, *rel)
     if os.path.isfile(cand):
         return cand
-    # walk case-insensitively, consuming path components one by one
-    cur = app_dir
-    for i, comp in enumerate(rel):
-        if os.path.isfile(os.path.join(cur, comp)):
-            cur = os.path.join(cur, comp)
-            continue
+
+    def dfs(cur, i):
+        if i == len(rel):
+            return cur if os.path.isfile(cur) else None
+        comp = rel[i]
+        direct = os.path.join(cur, comp)
+        # exact-case fast path first
+        if os.path.exists(direct):
+            hit = dfs(direct, i + 1)
+            if hit:
+                return hit
         try:
-            match = [e for e in os.listdir(cur)
-                     if e.lower() == comp.lower()]
+            names = os.listdir(cur)
         except OSError:
             return None
-        if not match:
-            return None
-        cur = os.path.join(cur, match[0])
-    return cur if os.path.isfile(cur) else None
+        # all case-insensitive twins (excluding the exact one tried above)
+        for name in names:
+            if name != comp and name.lower() == comp.lower():
+                hit = dfs(os.path.join(cur, name), i + 1)
+                if hit:
+                    return hit
+        return None
+
+    return dfs(app_dir, 0)
 
 
 def _find_footer(f):
