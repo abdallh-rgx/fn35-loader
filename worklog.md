@@ -749,3 +749,46 @@ Stage Summary:
   the grind; the login screen is gated on this grind completing
 - runner w3: fresh phys replication, window ends ~04:44Z; w4 will
   restore its state
+
+---
+Task ID: session-9 (2026-10-27 17:19Z-, post env-restore #6)
+Agent: main (Z.ai)
+Task: 1:1 GitHub autosync link (user demand — 35% time lost to source
+loss) + local grind restart after environment death
+
+Work Log:
+- USER DIRECTIVE: bind repo 1:1 to GitHub so every change saves
+  immediately. ROOT CAUSE of past loss confirmed: git_save.sh staged
+  only scripts/ + worklog.md — rust/, .github/ and root files never
+  saved (worklog session-8 noted it; the fix was never applied to the
+  script itself).
+- 1:1 LINK LIVE: scripts/autosync.sh daemon (setsid, 90s interval):
+  git add -A (gitignore is the only filter) -> commit -> push, with
+  pull-rebase-ours fallback for remote races. git_save.sh rewritten to
+  add -A too. downloads_probe/ + fn35/autosync.log added to .gitignore.
+  NOTE: daemons MUST be launched with setsid — the tool session kills
+  the process group on exit (first two launches died this way).
+- ENV RESTORE #6: unicorn 2.1.4, capstone 5.0.7, keystone-engine
+  (pip 'keystone' is a stub — AttributeError Ks; pip 'keystone-engine'
+  is the real one), pyelftools, z3 5.3.2, PIL, pycryptodome OK.
+  snap/ EMPTY again (16.9B grind state lost) -> fresh boot path.
+- FIND_PAK DFS FIX (critical, fresh-boot blocker): cookeddata/ holds
+  BOTH 'FortniteGame/' (empty twin) and 'fortnitegame/' (pak holder);
+  old single-pass walk took listdir()[0] and descended the empty twin
+  -> '[pakfs] no pak at None' -> uproject wall. New find_pak: DFS over
+  every case-variant branch, exact-case fast path first, returns the
+  branch that reaches the .pak. Verified: finds
+  cookeddata/fortnitegame/content/paks/pakchunkearly-iosclient.pak.
+- LOCAL CHAIN RELAUNCHED (setsid): segment 1 of the fresh universe
+  mounts pakfs cleanly — '[pakfs] 3260 entries, 278 dirs' — the
+  uproject wall is passed from boot. BLOCK sync from start.
+- RUNNER: window w1 for the phys chain ended 15:18Z (deadline),
+  retriggered 40529663821 at 15:18:35Z — in_progress, ends ~21:18Z.
+  No artifacts yet (uploaded at window end).
+
+Stage Summary:
+- 1:1 GitHub mirror live (autosync 90s) + git_save fixed — no more
+  source loss
+- Local fresh universe grinding with pakfs ACTIVE from segment 1
+- Next milestones expected: init 773/773 -> didFinish -> pak mount ->
+  LogInit -> device profiles -> the remap grind (11-15B est)
