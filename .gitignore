@@ -19,3 +19,5 @@ fn35/*.log
 fn35/*.txt
 .env
 fn35/
+downloads_probe/
+fn35/autosync.log
