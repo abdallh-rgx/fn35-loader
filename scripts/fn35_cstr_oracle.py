@@ -115,9 +115,10 @@ memcases = [
 for dstb, srcb, n in memcases:
     d = SCR
     BUF[d:d + len(dstb)] = dstb
-    s_ = place(srcb.decode("latin-1"))  # place via utf-8 of latin-1? use bytes
+    s_ = place(srcb.decode("latin-1"))
     # place raw bytes directly
     BUF[s_:s_ + len(srcb)] = srcb + b"\x00"
+    CL._memcpy(L, d, s_, n)
     VEC.append({"fn": "memcpy", "dst": dstb.hex(), "src": srcb.hex(), "n": n,
                 "out": read_back(d, n).hex(), "n_actual": n})
 for fill in [0, 0x41, 0xFF]:
@@ -159,20 +160,20 @@ for cur, src, size in [("abc", "def", 10), ("abc", "def", 4),
                        ("", "hello", 6), ("longdst", "s", 100)]:
     clear_scratch()
     da, sa = place(cur), place(src)
-    BUF[SCR:SCR + len(cur)] = cur.encode()
+    BUF[SCR:SCR + len(cur.encode()) + 1] = cur.encode() + b"\x00"
     r = CL._strlcat(L, SCR, sa, size)
     room = size - 1 - len(cur.encode())
     span = min(len(src.encode()), room) if (size and room > 0) else 0
     VEC.append({"fn": "strlcat", "dst": cur, "src": src, "size": size,
-                "ret": r, "at": len(cur.encode()),
-                "out": read_back(SCR + len(cur.encode()), span).hex() if span else ""})
+                "ret": r, "at": 0,
+                "out": read_back(SCR, span).hex() if span else ""})
 for cur, src in [("abc", "def"), ("", "x"), ("end", "")]:
     clear_scratch()
     sa = place(src)
-    BUF[SCR:SCR + len(cur)] = cur.encode()
+    BUF[SCR:SCR + len(cur.encode()) + 1] = cur.encode() + b"\x00"
     CL._strcat(L, SCR, sa)
     VEC.append({"fn": "strcat", "dst": cur, "src": src,
-                "out": read_back(SCR, len(cur) + len(src) + 1).hex()})
+                "out": read_back(SCR, len(cur.encode()) + len(src.encode()) + 1).hex()})
 
 # ---- strstr / strchr / strrchr / strchrnul ----
 for hay, ndl in [("abcdef", "cd"), ("abcdef", ""), ("abcdef", "z"),

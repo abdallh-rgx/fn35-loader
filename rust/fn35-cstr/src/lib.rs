@@ -90,7 +90,7 @@ pub fn strlen(s: &[u8]) -> usize {
 }
 
 pub fn strnlen(s: &[u8], n: usize) -> usize {
-    gcstr(s, n.max(1)).len()
+    gcstr(s, n).len()
 }
 
 fn cmp3(x: &str, y: &str) -> i32 {
@@ -166,8 +166,9 @@ pub fn strlcpy(src: &str, size: usize) -> (Vec<u8>, usize) {
     (out, s.len())
 }
 
-/// Python quirk: writes `s[:room]` (NO terminating NUL!) at
-/// `dst + len(dst)`; returns (offset, bytes, ret = len(dst)+len(src)).
+/// Python quirk (1:1): writes `s[:room]` AT DST OFFSET 0 (NOT appended
+/// at dst+len — the Python impl overwrites from the start!); returns
+/// (offset, bytes, ret = len(dst)+len(src)). offset is always 0.
 pub fn strlcat(dst_cur: &str, src: &str, size: usize) -> (usize, Vec<u8>, usize) {
     let cur = dst_cur.as_bytes();
     let s = src.as_bytes();
@@ -176,7 +177,7 @@ pub fn strlcat(dst_cur: &str, src: &str, size: usize) -> (usize, Vec<u8>, usize)
         let room = size - 1 - cur.len();
         out.extend_from_slice(&s[..room.min(s.len())]);
     }
-    (cur.len(), out, cur.len() + s.len())
+    (0, out, cur.len() + s.len())
 }
 
 /// Writes (cur + src + NUL); returns the written bytes.
@@ -319,28 +320,27 @@ pub fn python_float_str(v: f64) -> String {
         Some((i_, f_)) => (i_.to_string(), f_.to_string()),
         None => (mant.to_string(), String::new()),
     };
+    let nd_int = int_part.len();
     let mut digits = format!("{}{}", int_part, frac_part);
-    let ndig_intfrac = int_part.len();
-    // strip trailing zeros of the fraction (shortest form)
-    while digits.len() > 1 && digits.ends_with('0') && frac_part.ends_with('0') {
+    // strip trailing zeros of the fraction only (shortest form)
+    while digits.len() > nd_int && digits.ends_with('0') {
         digits.pop();
     }
     let sign_str = if neg { "-" } else { "" };
     if (-4..16).contains(&exp) {
-        // decimal form
+        // decimal form: the real point sits after exp+1 integer digits
         if exp >= 0 {
-            let e = exp as usize;
-            let mut ip = String::new();
-            if digits.len() > e {
-                ip = digits[..e].to_string();
-                let fp = &digits[e..];
+            let int_digits = (exp + 1) as usize;
+            if digits.len() >= int_digits {
+                let ip = digits[..int_digits].to_string();
+                let fp = &digits[int_digits..];
                 if fp.is_empty() {
                     format!("{}{}.0", sign_str, ip)
                 } else {
                     format!("{}{}.{}", sign_str, ip, fp)
                 }
             } else {
-                ip = digits.clone() + &"0".repeat(e - digits.len());
+                let ip = digits.clone() + &"0".repeat(int_digits - digits.len());
                 format!("{}{}.0", sign_str, ip)
             }
         } else {
@@ -362,8 +362,6 @@ pub fn python_float_str(v: f64) -> String {
             format!("{}{}e{}{}", sign_str, m, sign, ea)
         }
     }
-    // silence unused warning path
-    let _ = ndig_intfrac;
 }
 
 /// Python `float()` subset parser (the token after split()).
@@ -499,8 +497,8 @@ pub fn python_int_parse(s: &str) -> Option<i128> {
     Some(if neg { -v } else { v })
 }
 
-pub fn atoi(s: &str) -> Option<i64> {
-    python_int_parse(s).map(|v| v as i64)
+pub fn atoi(s: &str) -> i64 {
+    python_int_parse(s).unwrap_or(0) as i64
 }
 
 pub fn atof(s: &str) -> f64 {

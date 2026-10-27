@@ -452,7 +452,7 @@
   "dst": "0000000000000000",
   "src": "1111111111111111",
   "n": 8,
-  "out": "0000000000000000",
+  "out": "1111111111111111",
   "n_actual": 8
  },
  {
@@ -460,7 +460,7 @@
   "dst": "616263646566",
   "src": "414243444546",
   "n": 3,
-  "out": "006162",
+  "out": "414243",
   "n_actual": 3
  },
  {
@@ -476,7 +476,7 @@
   "dst": "000102030405060708090a0b0c0d0e0f",
   "src": "ffffffffffffffffffffffffffffffff",
   "n": 16,
-  "out": "00000102030405060708090a0b0c0d0e",
+  "out": "ffffffffffffffffffffffffffffffff",
   "n_actual": 16
  },
  {
@@ -866,17 +866,17 @@
   "dst": "abc",
   "src": "def",
   "size": 10,
-  "ret": 765,
-  "at": 3,
-  "out": "aaaaaa"
+  "ret": 6,
+  "at": 0,
+  "out": "646566"
  },
  {
   "fn": "strlcat",
   "dst": "abc",
   "src": "def",
   "size": 4,
-  "ret": 765,
-  "at": 3,
+  "ret": 6,
+  "at": 0,
   "out": ""
  },
  {
@@ -884,8 +884,8 @@
   "dst": "abc",
   "src": "def",
   "size": 3,
-  "ret": 765,
-  "at": 3,
+  "ret": 6,
+  "at": 0,
   "out": ""
  },
  {
@@ -893,8 +893,8 @@
   "dst": "abc",
   "src": "def",
   "size": 0,
-  "ret": 765,
-  "at": 3,
+  "ret": 6,
+  "at": 0,
   "out": ""
  },
  {
@@ -902,36 +902,36 @@
   "dst": "",
   "src": "hello",
   "size": 6,
-  "ret": 773,
+  "ret": 5,
   "at": 0,
-  "out": "aaaaaaaaaa"
+  "out": "68656c6c6f"
  },
  {
   "fn": "strlcat",
   "dst": "longdst",
   "src": "s",
   "size": 100,
-  "ret": 755,
-  "at": 7,
-  "out": "aa"
+  "ret": 8,
+  "at": 0,
+  "out": "73"
  },
  {
   "fn": "strcat",
   "dst": "abc",
   "src": "def",
-  "out": "616263efbfbdef"
+  "out": "61626364656600"
  },
  {
   "fn": "strcat",
   "dst": "",
   "src": "x",
-  "out": "efbf"
+  "out": "7800"
  },
  {
   "fn": "strcat",
   "dst": "end",
   "src": "",
-  "out": "656e64ef"
+  "out": "656e6400"
  },
  {
   "fn": "strstr",

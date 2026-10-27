@@ -191,11 +191,7 @@ fn differential() {
             }
             "atoi" => {
                 let s = v["s"].as_str().unwrap();
-                let mine = atoi(s);
-                match (mine, v["ret"].as_i64()) {
-                    (Some(m), Some(p)) => m == p,
-                    _ => false,
-                }
+                atoi(s) == v["ret"].as_i64().unwrap()
             }
             "atof" => {
                 let s = v["s"].as_str().unwrap();
