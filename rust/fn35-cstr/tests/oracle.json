@@ -1,0 +1,1487 @@
+[
+ {
+  "fn": "strlen",
+  "s": "",
+  "ret": 0
+ },
+ {
+  "fn": "strnlen",
+  "s": "",
+  "n": 3,
+  "ret": 0
+ },
+ {
+  "fn": "strnlen",
+  "s": "",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strlen",
+  "s": "a",
+  "ret": 1
+ },
+ {
+  "fn": "strnlen",
+  "s": "a",
+  "n": 3,
+  "ret": 1
+ },
+ {
+  "fn": "strnlen",
+  "s": "a",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strlen",
+  "s": "hello",
+  "ret": 5
+ },
+ {
+  "fn": "strnlen",
+  "s": "hello",
+  "n": 3,
+  "ret": 5
+ },
+ {
+  "fn": "strnlen",
+  "s": "hello",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strlen",
+  "s": "UE4-Fortnite!!",
+  "ret": 14
+ },
+ {
+  "fn": "strnlen",
+  "s": "UE4-Fortnite!!",
+  "n": 3,
+  "ret": 14
+ },
+ {
+  "fn": "strnlen",
+  "s": "UE4-Fortnite!!",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strlen",
+  "s": "12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab",
+  "ret": 80
+ },
+ {
+  "fn": "strnlen",
+  "s": "12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab",
+  "n": 3,
+  "ret": 80
+ },
+ {
+  "fn": "strnlen",
+  "s": "12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strcmp",
+  "a": "abc",
+  "b": "abc",
+  "ret": 0
+ },
+ {
+  "fn": "strncmp",
+  "a": "abc",
+  "b": "abc",
+  "n": 2,
+  "ret": 0
+ },
+ {
+  "fn": "strncmp",
+  "a": "abc",
+  "b": "abc",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strcasecmp",
+  "a": "abc",
+  "b": "abc",
+  "ret": 0
+ },
+ {
+  "fn": "strncasecmp",
+  "a": "abc",
+  "b": "abc",
+  "n": 3,
+  "ret": 0
+ },
+ {
+  "fn": "strcmp",
+  "a": "abc",
+  "b": "abd",
+  "ret": -1
+ },
+ {
+  "fn": "strncmp",
+  "a": "abc",
+  "b": "abd",
+  "n": 2,
+  "ret": 0
+ },
+ {
+  "fn": "strncmp",
+  "a": "abc",
+  "b": "abd",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strcasecmp",
+  "a": "abc",
+  "b": "abd",
+  "ret": -1
+ },
+ {
+  "fn": "strncasecmp",
+  "a": "abc",
+  "b": "abd",
+  "n": 3,
+  "ret": -1
+ },
+ {
+  "fn": "strcmp",
+  "a": "b",
+  "b": "a",
+  "ret": 1
+ },
+ {
+  "fn": "strncmp",
+  "a": "b",
+  "b": "a",
+  "n": 2,
+  "ret": 1
+ },
+ {
+  "fn": "strncmp",
+  "a": "b",
+  "b": "a",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strcasecmp",
+  "a": "b",
+  "b": "a",
+  "ret": 1
+ },
+ {
+  "fn": "strncasecmp",
+  "a": "b",
+  "b": "a",
+  "n": 3,
+  "ret": 1
+ },
+ {
+  "fn": "strcmp",
+  "a": "a",
+  "b": "b",
+  "ret": -1
+ },
+ {
+  "fn": "strncmp",
+  "a": "a",
+  "b": "b",
+  "n": 2,
+  "ret": -1
+ },
+ {
+  "fn": "strncmp",
+  "a": "a",
+  "b": "b",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strcasecmp",
+  "a": "a",
+  "b": "b",
+  "ret": -1
+ },
+ {
+  "fn": "strncasecmp",
+  "a": "a",
+  "b": "b",
+  "n": 3,
+  "ret": -1
+ },
+ {
+  "fn": "strcmp",
+  "a": "",
+  "b": "",
+  "ret": 0
+ },
+ {
+  "fn": "strncmp",
+  "a": "",
+  "b": "",
+  "n": 2,
+  "ret": 0
+ },
+ {
+  "fn": "strncmp",
+  "a": "",
+  "b": "",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strcasecmp",
+  "a": "",
+  "b": "",
+  "ret": 0
+ },
+ {
+  "fn": "strncasecmp",
+  "a": "",
+  "b": "",
+  "n": 3,
+  "ret": 0
+ },
+ {
+  "fn": "strcmp",
+  "a": "",
+  "b": "a",
+  "ret": -1
+ },
+ {
+  "fn": "strncmp",
+  "a": "",
+  "b": "a",
+  "n": 2,
+  "ret": -1
+ },
+ {
+  "fn": "strncmp",
+  "a": "",
+  "b": "a",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strcasecmp",
+  "a": "",
+  "b": "a",
+  "ret": -1
+ },
+ {
+  "fn": "strncasecmp",
+  "a": "",
+  "b": "a",
+  "n": 3,
+  "ret": -1
+ },
+ {
+  "fn": "strcmp",
+  "a": "a",
+  "b": "",
+  "ret": 1
+ },
+ {
+  "fn": "strncmp",
+  "a": "a",
+  "b": "",
+  "n": 2,
+  "ret": 1
+ },
+ {
+  "fn": "strncmp",
+  "a": "a",
+  "b": "",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strcasecmp",
+  "a": "a",
+  "b": "",
+  "ret": 1
+ },
+ {
+  "fn": "strncasecmp",
+  "a": "a",
+  "b": "",
+  "n": 3,
+  "ret": 1
+ },
+ {
+  "fn": "strcmp",
+  "a": "ABC",
+  "b": "abc",
+  "ret": -1
+ },
+ {
+  "fn": "strncmp",
+  "a": "ABC",
+  "b": "abc",
+  "n": 2,
+  "ret": -1
+ },
+ {
+  "fn": "strncmp",
+  "a": "ABC",
+  "b": "abc",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strcasecmp",
+  "a": "ABC",
+  "b": "abc",
+  "ret": 0
+ },
+ {
+  "fn": "strncasecmp",
+  "a": "ABC",
+  "b": "abc",
+  "n": 3,
+  "ret": 0
+ },
+ {
+  "fn": "strcmp",
+  "a": "abc",
+  "b": "ABC",
+  "ret": 1
+ },
+ {
+  "fn": "strncmp",
+  "a": "abc",
+  "b": "ABC",
+  "n": 2,
+  "ret": 1
+ },
+ {
+  "fn": "strncmp",
+  "a": "abc",
+  "b": "ABC",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strcasecmp",
+  "a": "abc",
+  "b": "ABC",
+  "ret": 0
+ },
+ {
+  "fn": "strncasecmp",
+  "a": "abc",
+  "b": "ABC",
+  "n": 3,
+  "ret": 0
+ },
+ {
+  "fn": "strcmp",
+  "a": "Fortnite",
+  "b": "fortnite",
+  "ret": -1
+ },
+ {
+  "fn": "strncmp",
+  "a": "Fortnite",
+  "b": "fortnite",
+  "n": 2,
+  "ret": -1
+ },
+ {
+  "fn": "strncmp",
+  "a": "Fortnite",
+  "b": "fortnite",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strcasecmp",
+  "a": "Fortnite",
+  "b": "fortnite",
+  "ret": 0
+ },
+ {
+  "fn": "strncasecmp",
+  "a": "Fortnite",
+  "b": "fortnite",
+  "n": 3,
+  "ret": 0
+ },
+ {
+  "fn": "strcmp",
+  "a": "\u00c9",
+  "b": "\u00e9",
+  "ret": -1
+ },
+ {
+  "fn": "strncmp",
+  "a": "\u00c9",
+  "b": "\u00e9",
+  "n": 2,
+  "ret": -1
+ },
+ {
+  "fn": "strncmp",
+  "a": "\u00c9",
+  "b": "\u00e9",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strcasecmp",
+  "a": "\u00c9",
+  "b": "\u00e9",
+  "ret": 0
+ },
+ {
+  "fn": "strncasecmp",
+  "a": "\u00c9",
+  "b": "\u00e9",
+  "n": 3,
+  "ret": 0
+ },
+ {
+  "fn": "memcpy",
+  "dst": "0000000000000000",
+  "src": "1111111111111111",
+  "n": 8,
+  "out": "0000000000000000",
+  "n_actual": 8
+ },
+ {
+  "fn": "memcpy",
+  "dst": "616263646566",
+  "src": "414243444546",
+  "n": 3,
+  "out": "006162",
+  "n_actual": 3
+ },
+ {
+  "fn": "memcpy",
+  "dst": "",
+  "src": "",
+  "n": 0,
+  "out": "",
+  "n_actual": 0
+ },
+ {
+  "fn": "memcpy",
+  "dst": "000102030405060708090a0b0c0d0e0f",
+  "src": "ffffffffffffffffffffffffffffffff",
+  "n": 16,
+  "out": "00000102030405060708090a0b0c0d0e",
+  "n_actual": 16
+ },
+ {
+  "fn": "memset",
+  "c": 0,
+  "n": 0,
+  "out": ""
+ },
+ {
+  "fn": "bzero",
+  "n": 0,
+  "out": ""
+ },
+ {
+  "fn": "memset",
+  "c": 0,
+  "n": 1,
+  "out": "00"
+ },
+ {
+  "fn": "bzero",
+  "n": 1,
+  "out": "00"
+ },
+ {
+  "fn": "memset",
+  "c": 0,
+  "n": 5,
+  "out": "0000000000"
+ },
+ {
+  "fn": "bzero",
+  "n": 5,
+  "out": "0000000000"
+ },
+ {
+  "fn": "memset",
+  "c": 0,
+  "n": 16,
+  "out": "00000000000000000000000000000000"
+ },
+ {
+  "fn": "bzero",
+  "n": 16,
+  "out": "00000000000000000000000000000000"
+ },
+ {
+  "fn": "memset",
+  "c": 65,
+  "n": 0,
+  "out": ""
+ },
+ {
+  "fn": "bzero",
+  "n": 0,
+  "out": ""
+ },
+ {
+  "fn": "memset",
+  "c": 65,
+  "n": 1,
+  "out": "41"
+ },
+ {
+  "fn": "bzero",
+  "n": 1,
+  "out": "00"
+ },
+ {
+  "fn": "memset",
+  "c": 65,
+  "n": 5,
+  "out": "4141414141"
+ },
+ {
+  "fn": "bzero",
+  "n": 5,
+  "out": "0000000000"
+ },
+ {
+  "fn": "memset",
+  "c": 65,
+  "n": 16,
+  "out": "41414141414141414141414141414141"
+ },
+ {
+  "fn": "bzero",
+  "n": 16,
+  "out": "00000000000000000000000000000000"
+ },
+ {
+  "fn": "memset",
+  "c": 255,
+  "n": 0,
+  "out": ""
+ },
+ {
+  "fn": "bzero",
+  "n": 0,
+  "out": ""
+ },
+ {
+  "fn": "memset",
+  "c": 255,
+  "n": 1,
+  "out": "ff"
+ },
+ {
+  "fn": "bzero",
+  "n": 1,
+  "out": "00"
+ },
+ {
+  "fn": "memset",
+  "c": 255,
+  "n": 5,
+  "out": "ffffffffff"
+ },
+ {
+  "fn": "bzero",
+  "n": 5,
+  "out": "0000000000"
+ },
+ {
+  "fn": "memset",
+  "c": 255,
+  "n": 16,
+  "out": "ffffffffffffffffffffffffffffffff"
+ },
+ {
+  "fn": "bzero",
+  "n": 16,
+  "out": "00000000000000000000000000000000"
+ },
+ {
+  "fn": "memcmp",
+  "a": "616263",
+  "b": "616263",
+  "n": 3,
+  "ret": 0
+ },
+ {
+  "fn": "memcmp",
+  "a": "616263",
+  "b": "616264",
+  "n": 3,
+  "ret": -1
+ },
+ {
+  "fn": "memcmp",
+  "a": "6162",
+  "b": "6163",
+  "n": 1,
+  "ret": 0
+ },
+ {
+  "fn": "memcmp",
+  "a": "61",
+  "b": "62",
+  "n": 0,
+  "ret": 0
+ },
+ {
+  "fn": "memcmp",
+  "a": "0061",
+  "b": "0161",
+  "n": 2,
+  "ret": -1
+ },
+ {
+  "fn": "memcmp",
+  "a": "7a7a",
+  "b": "7a61",
+  "n": 2,
+  "ret": 1
+ },
+ {
+  "fn": "strncpy",
+  "src": "",
+  "n": 0,
+  "out": ""
+ },
+ {
+  "fn": "strncpy",
+  "src": "",
+  "n": 1,
+  "out": "00"
+ },
+ {
+  "fn": "strncpy",
+  "src": "",
+  "n": 3,
+  "out": "000000"
+ },
+ {
+  "fn": "strncpy",
+  "src": "",
+  "n": 100,
+  "out": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+ },
+ {
+  "fn": "strlcpy",
+  "src": "",
+  "size": 0,
+  "ret": 0,
+  "out": ""
+ },
+ {
+  "fn": "strlcpy",
+  "src": "",
+  "size": 1,
+  "ret": 0,
+  "out": "00"
+ },
+ {
+  "fn": "strlcpy",
+  "src": "",
+  "size": 3,
+  "ret": 0,
+  "out": "00"
+ },
+ {
+  "fn": "strlcpy",
+  "src": "",
+  "size": 100,
+  "ret": 0,
+  "out": "00"
+ },
+ {
+  "fn": "strncpy",
+  "src": "a",
+  "n": 0,
+  "out": ""
+ },
+ {
+  "fn": "strncpy",
+  "src": "a",
+  "n": 1,
+  "out": "61"
+ },
+ {
+  "fn": "strncpy",
+  "src": "a",
+  "n": 3,
+  "out": "610000"
+ },
+ {
+  "fn": "strncpy",
+  "src": "a",
+  "n": 100,
+  "out": "61000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+ },
+ {
+  "fn": "strlcpy",
+  "src": "a",
+  "size": 0,
+  "ret": 1,
+  "out": ""
+ },
+ {
+  "fn": "strlcpy",
+  "src": "a",
+  "size": 1,
+  "ret": 1,
+  "out": "00"
+ },
+ {
+  "fn": "strlcpy",
+  "src": "a",
+  "size": 3,
+  "ret": 1,
+  "out": "6100"
+ },
+ {
+  "fn": "strlcpy",
+  "src": "a",
+  "size": 100,
+  "ret": 1,
+  "out": "6100"
+ },
+ {
+  "fn": "strncpy",
+  "src": "engine.ini",
+  "n": 0,
+  "out": ""
+ },
+ {
+  "fn": "strncpy",
+  "src": "engine.ini",
+  "n": 1,
+  "out": "65"
+ },
+ {
+  "fn": "strncpy",
+  "src": "engine.ini",
+  "n": 3,
+  "out": "656e67"
+ },
+ {
+  "fn": "strncpy",
+  "src": "engine.ini",
+  "n": 100,
+  "out": "656e67696e652e696e69000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+ },
+ {
+  "fn": "strlcpy",
+  "src": "engine.ini",
+  "size": 0,
+  "ret": 10,
+  "out": ""
+ },
+ {
+  "fn": "strlcpy",
+  "src": "engine.ini",
+  "size": 1,
+  "ret": 10,
+  "out": "00"
+ },
+ {
+  "fn": "strlcpy",
+  "src": "engine.ini",
+  "size": 3,
+  "ret": 10,
+  "out": "656e00"
+ },
+ {
+  "fn": "strlcpy",
+  "src": "engine.ini",
+  "size": 100,
+  "ret": 10,
+  "out": "656e67696e652e696e6900"
+ },
+ {
+  "fn": "strncpy",
+  "src": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "n": 0,
+  "out": ""
+ },
+ {
+  "fn": "strncpy",
+  "src": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "n": 1,
+  "out": "78"
+ },
+ {
+  "fn": "strncpy",
+  "src": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "n": 3,
+  "out": "787878"
+ },
+ {
+  "fn": "strncpy",
+  "src": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "n": 100,
+  "out": "78787878787878787878787878787878787878787878787878787878787878787878787878787878000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+ },
+ {
+  "fn": "strlcpy",
+  "src": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "size": 0,
+  "ret": 40,
+  "out": ""
+ },
+ {
+  "fn": "strlcpy",
+  "src": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "size": 1,
+  "ret": 40,
+  "out": "00"
+ },
+ {
+  "fn": "strlcpy",
+  "src": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "size": 3,
+  "ret": 40,
+  "out": "787800"
+ },
+ {
+  "fn": "strlcpy",
+  "src": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "size": 100,
+  "ret": 40,
+  "out": "7878787878787878787878787878787878787878787878787878787878787878787878787878787800"
+ },
+ {
+  "fn": "strlcat",
+  "dst": "abc",
+  "src": "def",
+  "size": 10,
+  "ret": 765,
+  "at": 3,
+  "out": "aaaaaa"
+ },
+ {
+  "fn": "strlcat",
+  "dst": "abc",
+  "src": "def",
+  "size": 4,
+  "ret": 765,
+  "at": 3,
+  "out": ""
+ },
+ {
+  "fn": "strlcat",
+  "dst": "abc",
+  "src": "def",
+  "size": 3,
+  "ret": 765,
+  "at": 3,
+  "out": ""
+ },
+ {
+  "fn": "strlcat",
+  "dst": "abc",
+  "src": "def",
+  "size": 0,
+  "ret": 765,
+  "at": 3,
+  "out": ""
+ },
+ {
+  "fn": "strlcat",
+  "dst": "",
+  "src": "hello",
+  "size": 6,
+  "ret": 773,
+  "at": 0,
+  "out": "aaaaaaaaaa"
+ },
+ {
+  "fn": "strlcat",
+  "dst": "longdst",
+  "src": "s",
+  "size": 100,
+  "ret": 755,
+  "at": 7,
+  "out": "aa"
+ },
+ {
+  "fn": "strcat",
+  "dst": "abc",
+  "src": "def",
+  "out": "616263efbfbdef"
+ },
+ {
+  "fn": "strcat",
+  "dst": "",
+  "src": "x",
+  "out": "efbf"
+ },
+ {
+  "fn": "strcat",
+  "dst": "end",
+  "src": "",
+  "out": "656e64ef"
+ },
+ {
+  "fn": "strstr",
+  "hay": "abcdef",
+  "needle": "cd",
+  "ret": 2
+ },
+ {
+  "fn": "strstr",
+  "hay": "abcdef",
+  "needle": "",
+  "ret": 0
+ },
+ {
+  "fn": "strstr",
+  "hay": "abcdef",
+  "needle": "z",
+  "ret": null
+ },
+ {
+  "fn": "strstr",
+  "hay": "aXbXc",
+  "needle": "X",
+  "ret": 1
+ },
+ {
+  "fn": "strstr",
+  "hay": "aaa",
+  "needle": "aa",
+  "ret": 0
+ },
+ {
+  "fn": "strchr",
+  "s": "hello",
+  "c": 108,
+  "ret": 2
+ },
+ {
+  "fn": "strrchr",
+  "s": "hello",
+  "c": 108,
+  "ret": 3
+ },
+ {
+  "fn": "strchrnul",
+  "s": "hello",
+  "c": 108,
+  "ret": 2
+ },
+ {
+  "fn": "strchr",
+  "s": "hello",
+  "c": 0,
+  "ret": 5
+ },
+ {
+  "fn": "strrchr",
+  "s": "hello",
+  "c": 0,
+  "ret": 5
+ },
+ {
+  "fn": "strchrnul",
+  "s": "hello",
+  "c": 0,
+  "ret": 5
+ },
+ {
+  "fn": "strchr",
+  "s": "hello",
+  "c": 122,
+  "ret": null
+ },
+ {
+  "fn": "strrchr",
+  "s": "hello",
+  "c": 122,
+  "ret": null
+ },
+ {
+  "fn": "strchrnul",
+  "s": "hello",
+  "c": 122,
+  "ret": 5
+ },
+ {
+  "fn": "strchr",
+  "s": "",
+  "c": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strrchr",
+  "s": "",
+  "c": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strchrnul",
+  "s": "",
+  "c": 0,
+  "ret": 0
+ },
+ {
+  "fn": "strchr",
+  "s": "",
+  "c": 97,
+  "ret": null
+ },
+ {
+  "fn": "strrchr",
+  "s": "",
+  "c": 97,
+  "ret": null
+ },
+ {
+  "fn": "strchrnul",
+  "s": "",
+  "c": 97,
+  "ret": 0
+ },
+ {
+  "fn": "strchr",
+  "s": "caf\u00e9",
+  "c": 233,
+  "ret": 3
+ },
+ {
+  "fn": "strrchr",
+  "s": "caf\u00e9",
+  "c": 233,
+  "ret": 3
+ },
+ {
+  "fn": "strchrnul",
+  "s": "caf\u00e9",
+  "c": 233,
+  "ret": 3
+ },
+ {
+  "fn": "strchr",
+  "s": "hello",
+  "c": 364,
+  "ret": 2
+ },
+ {
+  "fn": "strrchr",
+  "s": "hello",
+  "c": 364,
+  "ret": 3
+ },
+ {
+  "fn": "strchrnul",
+  "s": "hello",
+  "c": 364,
+  "ret": 2
+ },
+ {
+  "fn": "digit_val",
+  "c": "0",
+  "ret": 0
+ },
+ {
+  "fn": "digit_val",
+  "c": "9",
+  "ret": 9
+ },
+ {
+  "fn": "digit_val",
+  "c": "a",
+  "ret": 10
+ },
+ {
+  "fn": "digit_val",
+  "c": "f",
+  "ret": 15
+ },
+ {
+  "fn": "digit_val",
+  "c": "z",
+  "ret": 35
+ },
+ {
+  "fn": "digit_val",
+  "c": "A",
+  "ret": 10
+ },
+ {
+  "fn": "digit_val",
+  "c": "F",
+  "ret": 15
+ },
+ {
+  "fn": "digit_val",
+  "c": "Z",
+  "ret": 35
+ },
+ {
+  "fn": "digit_val",
+  "c": " ",
+  "ret": 99
+ },
+ {
+  "fn": "digit_val",
+  "c": "/",
+  "ret": 99
+ },
+ {
+  "fn": "strtol",
+  "s": "10",
+  "base": 10,
+  "ret": 10,
+  "consumed": 2
+ },
+ {
+  "fn": "strtol",
+  "s": "10",
+  "base": 0,
+  "ret": 10,
+  "consumed": 2
+ },
+ {
+  "fn": "strtol",
+  "s": "-42",
+  "base": 10,
+  "ret": 18446744073709551574,
+  "consumed": 3
+ },
+ {
+  "fn": "strtol",
+  "s": "+7",
+  "base": 10,
+  "ret": 7,
+  "consumed": 2
+ },
+ {
+  "fn": "strtol",
+  "s": "0x1F",
+  "base": 16,
+  "ret": 31,
+  "consumed": 4
+ },
+ {
+  "fn": "strtol",
+  "s": "0X1f",
+  "base": 0,
+  "ret": 31,
+  "consumed": 4
+ },
+ {
+  "fn": "strtol",
+  "s": "0xg",
+  "base": 0,
+  "ret": 0,
+  "consumed": 1
+ },
+ {
+  "fn": "strtol",
+  "s": "0x",
+  "base": 16,
+  "ret": 0,
+  "consumed": 0
+ },
+ {
+  "fn": "strtol",
+  "s": "0x",
+  "base": 0,
+  "ret": 0,
+  "consumed": 1
+ },
+ {
+  "fn": "strtol",
+  "s": "17",
+  "base": 8,
+  "ret": 15,
+  "consumed": 2
+ },
+ {
+  "fn": "strtol",
+  "s": "777",
+  "base": 8,
+  "ret": 511,
+  "consumed": 3
+ },
+ {
+  "fn": "strtol",
+  "s": "z",
+  "base": 36,
+  "ret": 35,
+  "consumed": 1
+ },
+ {
+  "fn": "strtol",
+  "s": "10,4",
+  "base": 10,
+  "ret": 10,
+  "consumed": 2
+ },
+ {
+  "fn": "strtol",
+  "s": "  12",
+  "base": 10,
+  "ret": 12,
+  "consumed": 4
+ },
+ {
+  "fn": "strtol",
+  "s": "\t\n 3",
+  "base": 10,
+  "ret": 3,
+  "consumed": 4
+ },
+ {
+  "fn": "strtol",
+  "s": "",
+  "base": 10,
+  "ret": 0,
+  "consumed": 0
+ },
+ {
+  "fn": "strtol",
+  "s": "abc",
+  "base": 10,
+  "ret": 0,
+  "consumed": 0
+ },
+ {
+  "fn": "strtol",
+  "s": "-0x10",
+  "base": 16,
+  "ret": 18446744073709551600,
+  "consumed": 5
+ },
+ {
+  "fn": "strtol",
+  "s": "ffff",
+  "base": 16,
+  "ret": 65535,
+  "consumed": 4
+ },
+ {
+  "fn": "strtol",
+  "s": "FFFF",
+  "base": 16,
+  "ret": 65535,
+  "consumed": 4
+ },
+ {
+  "fn": "strtol",
+  "s": "0",
+  "base": 16,
+  "ret": 0,
+  "consumed": 1
+ },
+ {
+  "fn": "strtol",
+  "s": "0",
+  "base": 0,
+  "ret": 0,
+  "consumed": 1
+ },
+ {
+  "fn": "strtol",
+  "s": "1",
+  "base": 0,
+  "ret": 1,
+  "consumed": 1
+ },
+ {
+  "fn": "strtol",
+  "s": "8",
+  "base": 8,
+  "ret": 0,
+  "consumed": 0
+ },
+ {
+  "fn": "strtol",
+  "s": "9",
+  "base": 8,
+  "ret": 0,
+  "consumed": 0
+ },
+ {
+  "fn": "strtod",
+  "s": "3.14",
+  "val": "3.14",
+  "consumed": 4
+ },
+ {
+  "fn": "strtod",
+  "s": "-2.5e3",
+  "val": "-2500.0",
+  "consumed": 7
+ },
+ {
+  "fn": "strtod",
+  "s": "1e3",
+  "val": "1000.0",
+  "consumed": 6
+ },
+ {
+  "fn": "strtod",
+  "s": "0.0001",
+  "val": "0.0001",
+  "consumed": 6
+ },
+ {
+  "fn": "strtod",
+  "s": "abc",
+  "val": "0.0",
+  "consumed": 0
+ },
+ {
+  "fn": "strtod",
+  "s": "",
+  "val": "0.0",
+  "consumed": 3
+ },
+ {
+  "fn": "strtod",
+  "s": "  ",
+  "val": "0.0",
+  "consumed": 3
+ },
+ {
+  "fn": "strtod",
+  "s": "42abc",
+  "val": "0.0",
+  "consumed": 0
+ },
+ {
+  "fn": "strtod",
+  "s": "inf",
+  "val": "inf",
+  "consumed": 3
+ },
+ {
+  "fn": "strtod",
+  "s": "-inf",
+  "val": "-inf",
+  "consumed": 4
+ },
+ {
+  "fn": "strtod",
+  "s": "nan",
+  "val": "nan",
+  "consumed": 3
+ },
+ {
+  "fn": "strtod",
+  "s": "1e999",
+  "val": "inf",
+  "consumed": 3
+ },
+ {
+  "fn": "strtod",
+  "s": "0.5 7.9",
+  "val": "0.5",
+  "consumed": 3
+ },
+ {
+  "fn": "strtod",
+  "s": "1_0.5",
+  "val": "10.5",
+  "consumed": 4
+ },
+ {
+  "fn": "strtod",
+  "s": ".5",
+  "val": "0.5",
+  "consumed": 3
+ },
+ {
+  "fn": "atoi",
+  "s": "12",
+  "ret": 12
+ },
+ {
+  "fn": "atof",
+  "s": "12",
+  "val": "12.0"
+ },
+ {
+  "fn": "atoi",
+  "s": "  -7  ",
+  "ret": -7
+ },
+ {
+  "fn": "atof",
+  "s": "  -7  ",
+  "val": "-7.0"
+ },
+ {
+  "fn": "atoi",
+  "s": "",
+  "ret": 0
+ },
+ {
+  "fn": "atof",
+  "s": "",
+  "val": "0.0"
+ },
+ {
+  "fn": "atoi",
+  "s": "abc",
+  "ret": 0
+ },
+ {
+  "fn": "atof",
+  "s": "abc",
+  "val": "0.0"
+ },
+ {
+  "fn": "atoi",
+  "s": "+5",
+  "ret": 5
+ },
+ {
+  "fn": "atof",
+  "s": "+5",
+  "val": "5.0"
+ },
+ {
+  "fn": "atoi",
+  "s": "1_0",
+  "ret": 10
+ },
+ {
+  "fn": "atof",
+  "s": "1_0",
+  "val": "10.0"
+ },
+ {
+  "fn": "atoi",
+  "s": "0x10",
+  "ret": 0
+ },
+ {
+  "fn": "atof",
+  "s": "0x10",
+  "val": "0.0"
+ },
+ {
+  "fn": "atoi",
+  "s": "-",
+  "ret": 0
+ },
+ {
+  "fn": "atof",
+  "s": "-",
+  "val": "0.0"
+ }
+]

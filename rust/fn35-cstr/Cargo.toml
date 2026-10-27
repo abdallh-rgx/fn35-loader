@@ -1,0 +1,10 @@
+[package]
+name = "fn35-cstr"
+version = "0.1.0"
+edition = "2021"
+description = "C string/memory/conv semantics ported 1:1 from fn35_clib.py (differential-verified)"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

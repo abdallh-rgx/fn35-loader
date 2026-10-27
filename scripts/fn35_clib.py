@@ -624,7 +624,7 @@ def _strtol(l, s, endp, base):
     if b == 0:
         b = 10
         if i + 1 < n and st[i] == "0" and st[i + 1] in "xX" \
-                and _digit_val(st[i + 2]) < 16:
+                and i + 2 < n and _digit_val(st[i + 2]) < 16:
             b = 16
         elif i < n and st[i] == "0":
             b = 8
