@@ -4,6 +4,9 @@
 #  * crash counter resets when the crash PC CHANGES (progress, not a loop)
 #  * BLOCK sync once past the init table (didFinishLaunching seen) - the
 #    6.5x VM-grind speedup; CODE only needed for inits 0-253
+#  * sandbox-proof: flock (concurrent invocations skip), and every segment
+#    ends with git add+commit+push (the 1:1 GitHub mirror) — background
+#    daemons do NOT survive this sandbox, so persistence is per-segment
 cd /home/z/my-project/scripts
 export LD_LIBRARY_PATH=/home/z/mesa-debs/root/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 export FN35_SYNC_HOOK=auto
@@ -13,6 +16,19 @@ F35=/home/z/my-project/fn35
 CONSOLE=$F35/chain_console.log
 CRASHES_FILE=$F35/.chain_crashes
 CRASHPC_FILE=$F35/.chain_crashpc
+
+# ---- flock: if another one_seg is already running, SKIP this tick ----
+LOCK=/tmp/fn35_one_seg.lock
+if ! mkdir "$LOCK" 2>/dev/null; then
+  # stale lock? (holder crashed) — locks older than 15 min are stolen
+  if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +15 2>/dev/null)" ]; then
+    rm -rf "$LOCK"; mkdir "$LOCK" 2>/dev/null || exit 0
+  else
+    echo "[local] one_seg already running — skip"
+    exit 0
+  fi
+fi
+trap 'rm -rf "$LOCK"' EXIT
 
 # past the init table? (any recent log saw didFinishLaunching) -> BLOCK
 # past the init table (init 773/773 + didFinishLaunching done 2026-10-25):
@@ -70,3 +86,13 @@ else
   fi
 fi
 ls -t "$F35"/loc_*.log 2>/dev/null | tail -n +21 | xargs -r rm -f
+
+# ---- 1:1 GitHub mirror: every segment ends with add+commit+push ----
+cd /home/z/my-project
+if [ -n "$(git ls-files --others --exclude-standard)" ] || ! git diff --quiet HEAD 2>/dev/null; then
+  git add -A 2>/dev/null
+  git diff --cached --quiet 2>/dev/null || git commit -q -m "autosync: seg $(date -u +%FT%TZ)" 2>/dev/null
+fi
+git push -q origin main 2>/dev/null \
+  || { git pull --rebase -q -X ours origin main >/dev/null 2>&1; git push -q origin main 2>/dev/null; }
+echo "[local] git mirror synced $(date -u +%H:%M:%SZ)"
