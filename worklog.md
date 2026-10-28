@@ -908,3 +908,22 @@ MISSION: first frame — never stop. Every segment: push to GitHub.
   GitHub release tag 'snapshots' after every clean segment (background,
   non-fatal), and restores it when flag .snaprestore is present. Sandbox
   wipes can no longer lose boot progress.
+- 2026-10-29T20:35Z SESSION-10 CONT: fresh universe HEALTHY and grinding:
+  * segments RESUME correctly ([snap] restored phase=main, vclock +101.5s/seg)
+  * of.MainAppThread ALIVE (was done:1 in the quarantined zombie universe) —
+    the gles per-pname ARITY fix saved it; grinding 1270M->1720M instr/seg,
+    pc MOVING (0x101839110 -> 0x1018394b0 -> 0x101838c10, real execution)
+  * main(0x1000) parked in uikit_runloop (correct for iOS boot)
+  * of.RecordPeakMemory respawns every ~30s (timer-driven recorder, exits
+    cleanly, tid 0x1fd8+0x90 — normal pattern)
+  * BLOCK sync from segment 1 (state-aware one_seg.sh: init_index>=773)
+- FIXES THIS SESSION (all pushed): vt-fix (bcfddb4), upload endpoint
+  (12e7907), self-heal+state-aware sync (c8b5474); parallel agents:
+  deps fix (816a040), snapshot quarantine + backup feature (fbb4200)
+- SNAPSHOT BACKUP LIVE: snapshot-latest.tgz (51MB) verified on GitHub
+  release 'snapshots' (state: uploaded). Sandbox wipes can no longer
+  lose boot progress. Quarantined deep state preserved on disk:
+  snap_poison_1028_2010 (vclock 1793217927) / snap_good_poison_1028_2010.
+- MISSION TRACK: next milestones = portrait swap -> LogInit prints ->
+  device profiles (fresh run) -> RHI (arity-fixed) -> CoreUObject ->
+  Slate -> FIRST FRAME. vt-fix covers the PhysX garbage-vtable class.
