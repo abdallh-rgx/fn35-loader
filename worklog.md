@@ -949,3 +949,7 @@ MISSION: first frame — never stop. Every segment: push to GitHub.
   END-TO-END (binary+snapshot from releases, 530s budget, saved 4108
   regions / 107.5MB, uploaded back to 'snapshots' release). The grind is
   now sandbox-proof: local cron every 10 min + remote every 2h.
+- 2026-10-29T21:46Z MILESTONE: fresh boot crossed into engine init — first
+  UE console output (LogPakFile) in main phase; MainAppThread 10.2B instrs,
+  snapshot growing (51.7MB compressed). Boot chain: LogPakFile -> (next:
+  LogStreaming/LogSlate/LogRHI -> first frame).
