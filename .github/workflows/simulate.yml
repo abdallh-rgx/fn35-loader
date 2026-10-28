@@ -1,0 +1,125 @@
+name: fn35 simulate segment
+
+# Remote FN35 loader segment — the sandbox-proof runner.
+# Every run: pull binary + latest cloud snapshot, run ONE loader segment
+# (budget 530s), push the console log back, and upload the fresh snapshot
+# to the 'snapshots' release if it advanced.
+on:
+  workflow_dispatch:
+    inputs:
+      segments:
+        description: "how many back-to-back segments"
+        default: "3"
+  schedule:
+    - cron: "0 */2 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fn35-sim
+  cancel-in-progress: false
+
+jobs:
+  segment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      FN35_BUDGET: "530"
+      FN35_SNAPSHOT: /home/runner/work/fn35-loader/fn35-loader/fn35/snap
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install emulator deps
+        run: |
+          python -m pip install --quiet unicorn capstone z3-solver pillow
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libegl1 libgles2 libgl1-mesa-dri \
+            mesa-utils unzip tar curl >/dev/null
+
+      - name: Restore binary (from 'game-assets' release)
+        run: |
+          EXE=fn35/extracted/Payload/FortniteClient.app/FortniteClient
+          if [ ! -f "$EXE" ]; then
+            mkdir -p fn35/extracted
+            AID=$(curl -sL -H "Authorization: token $GH_TOKEN" \
+              https://api.github.com/repos/${{ github.repository }}/releases/tags/game-assets | \
+              python3 -c "import json,sys;print([a['id'] for a in json.load(sys.stdin)['assets'] if a['name']=='Fortnite35.ipa'][0])")
+            curl -sL -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/octet-stream" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/assets/$AID" \
+              -o fn35/Fortnite35.ipa
+            (cd fn35/extracted && unzip -q -o ../Fortnite35.ipa)
+            echo "binary restored: $(stat -c%s "$EXE") bytes"
+          fi
+
+      - name: Restore latest snapshot (from 'snapshots' release)
+        run: |
+          AID=$(curl -sL -H "Authorization: token $GH_TOKEN" \
+            https://api.github.com/repos/${{ github.repository }}/releases/tags/snapshots | \
+            python3 -c "import json,sys;d=json.load(sys.stdin);print([a['id'] for a in d.get('assets',[]) if a['name']=='snapshot-latest.tgz'][0] if d.get('assets') else '')")
+          if [ -n "$AID" ]; then
+            curl -sL -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/octet-stream" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/assets/$AID" \
+              -o /tmp/snapshot-latest.tgz
+            mkdir -p fn35
+            tar xzf /tmp/snapshot-latest.tgz -C fn35
+            echo "snapshot restored: $(python3 -c "import json;d=json.load(open('fn35/snap/index.json'));print(d.get('phase'),d.get('init_index'))")"
+          else
+            echo "no cloud snapshot yet — fresh boot"
+          fi
+
+      - name: Run segments
+        run: |
+          cd scripts
+          export LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          export FN35_SYNC_HOOK=auto
+          N="${{ github.event.inputs.segments || 3 }}"
+          for i in $(seq 1 $N); do
+            LOG=../fn35/gh_$(date +%m%d_%H%M%S).log
+            timeout 3300 python3 -u fn35_loader.py > "$LOG" 2>&1 || true
+            tail -2 "$LOG"
+            grep -q "FRAMES RENDERED\|first frame" "$LOG" && \
+              echo "FRAMES_RENDERED=1" >> "$GITHUB_ENV" && break
+            # stop if engine visibly advanced and snapshot was saved
+            grep -q "stopped: reason=budget" "$LOG" || break
+          done
+
+      - name: Upload fresh snapshot to 'snapshots' release
+        if: always()
+        run: |
+          if [ -f fn35/snap/index.json ]; then
+            tar czf /tmp/snapshot-latest.tgz -C fn35 snap
+            API=https://api.github.com/repos/${{ github.repository }}
+            RID=$(curl -sL -H "Authorization: token $GH_TOKEN" "$API/releases/tags/snapshots" | \
+              python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))")
+            if [ -z "$RID" ]; then
+              RID=$(curl -sL -H "Authorization: token $GH_TOKEN" -X POST \
+                -d '{"tag_name":"snapshots","name":"snapshot backups"}' \
+                "$API/releases" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))")
+            fi
+            OLD=$(curl -sL -H "Authorization: token $GH_TOKEN" "$API/releases/tags/snapshots" | \
+              python3 -c "import json,sys;d=json.load(sys.stdin);print([a['id'] for a in d.get('assets',[]) if a['name']=='snapshot-latest.tgz'][0] if d.get('assets') else '')")
+            [ -n "$OLD" ] && curl -sL -X DELETE -H "Authorization: token $GH_TOKEN" \
+              "$API/releases/assets/$OLD" >/dev/null
+            curl -sL -H "Authorization: token $GH_TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @/tmp/snapshot-latest.tgz \
+              "$API/releases/$RID/assets?name=snapshot-latest.tgz" >/dev/null
+            echo "cloud snapshot updated"
+          fi
+
+      - name: Commit logs (1:1 mirror)
+        if: always()
+        run: |
+          git config user.name "fn35-runner"
+          git config user.email "runner@users.noreply.github.com"
+          git add -A fn35/*.log 2>/dev/null || true
+          git diff --cached --quiet || git commit -q -m "gh-run: segment logs $(date -u +%FT%TZ)"
+          git push -q origin main || true

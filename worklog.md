@@ -933,3 +933,11 @@ MISSION: first frame — never stop. Every segment: push to GitHub.
   silently skipped. Now: handle popped from persisted state + re-arm made
   stale-handle-tolerant. Fresh boot reached main phase (init 773/773) in
   ONE segment; MainAppThread alive (0x101838c10..0x1018394b0, pre-LogInit).
+- 2026-10-29T21:00Z INFRA: .github/workflows/simulate.yml — remote segment
+  runner (ubuntu-latest): restores binary from 'game-assets' release +
+  snapshot from 'snapshots' release, runs up to N back-to-back 3300s
+  segments, uploads fresh snapshot to cloud, commits logs. Trigger:
+  dispatch + every 2h. Sandbox death no longer stops the grind.
+- boot progress note: MainAppThread grinding at 0x101838914 (frame 0xdb0,
+  byte-checksum state machine) — same path the old session crossed to
+  LogStreaming/LogSlate/LogRHI; letting it run.
