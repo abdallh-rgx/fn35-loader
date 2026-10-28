@@ -953,3 +953,7 @@ MISSION: first frame — never stop. Every segment: push to GitHub.
   UE console output (LogPakFile) in main phase; MainAppThread 10.2B instrs,
   snapshot growing (51.7MB compressed). Boot chain: LogPakFile -> (next:
   LogStreaming/LogSlate/LogRHI -> first frame).
+- 2026-10-29T21:56Z MILESTONE: LogInit + LogUObject printed — CoreUObject
+  init phase (the historical FWeakObjectPtr crash point) PASSED in fresh
+  boot with weak-guard caves armed. MainAppThread 11.6B instrs. Remaining
+  chain: LogSlate -> LogRHI (GL init, arity-fixed) -> first frame.
