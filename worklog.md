@@ -941,3 +941,7 @@ MISSION: first frame — never stop. Every segment: push to GitHub.
 - boot progress note: MainAppThread grinding at 0x101838914 (frame 0xdb0,
   byte-checksum state machine) — same path the old session crossed to
   LogStreaming/LogSlate/LogRHI; letting it run.
+- 2026-10-29T21:20Z FIX segAP: loader paths were hardcoded to /home/z/my-project
+  so the GH Actions runner died instantly ("missing executable"). Introduced
+  FN35_ROOT env (default unchanged locally) in fn35_loader.main() and
+  fn35_gles (CAPTURE_DIR + register_gl). Remote run now bootable.

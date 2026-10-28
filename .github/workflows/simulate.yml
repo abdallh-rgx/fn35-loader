@@ -27,6 +27,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       FN35_BUDGET: "530"
+      FN35_ROOT: /home/runner/work/fn35-loader/fn35-loader
       FN35_SNAPSHOT: /home/runner/work/fn35-loader/fn35-loader/fn35/snap
     steps:
       - uses: actions/checkout@v4

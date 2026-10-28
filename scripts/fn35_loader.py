@@ -4335,7 +4335,8 @@ def _freeifaddrs_fn(l, addrs):
 # ====================================================================
 
 def main():
-    base = "/home/z/my-project"
+    # FN35_ROOT: runnable on any host (GitHub Actions runner, CI, etc.)
+    base = os.environ.get("FN35_ROOT", "/home/z/my-project")
     macho_path = os.path.join(
         base, "fn35/extracted/Payload/FortniteClient.app/FortniteClient")
     sandbox = os.path.join(base, "fn35/sandbox")

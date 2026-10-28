@@ -21,7 +21,8 @@ SCREEN_W = 1280
 SCREEN_H = 720
 
 GLES = None          # module singleton state
-CAPTURE_DIR = "/home/z/my-project/download/fn35/screenshots"
+CAPTURE_DIR = os.environ.get(
+    "FN35_ROOT", "/home/z/my-project") + "/download/fn35/screenshots"
 MAX_SHOTS = int(os.environ.get("FN35_MAX_SHOTS", "400"))
 
 
@@ -814,7 +815,8 @@ def register_gl():
     """Register every GL import name into IMPL with adapters."""
     import fn35_macho
     mo = fn35_macho.MachO(
-        "/home/z/my-project/fn35/extracted/Payload/"
+        os.environ.get("FN35_ROOT", "/home/z/my-project")
+        + "/fn35/extracted/Payload/"
         "FortniteClient.app/FortniteClient")
     mo.load_symbols()
     imports = set()
