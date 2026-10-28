@@ -895,3 +895,16 @@ STATE AT 20:00Z:
   counter reset keep the chain stepping past poison states.
 
 MISSION: first frame — never stop. Every segment: push to GitHub.
+- 2026-10-29T20:12Z DIAGNOSIS: all resumed segments 19:56Z+ spin (316B instrs,
+  0 mapped, threads blocked@cond) because the live snapshot carries a DEAD
+  MainAppThread (done:1) from the pre-wipe session — the segAJ/segAN
+  glGetIntegerv fixed-size-copyback bug that smashed x29/x30 -> ret NULL.
+  The per-pname ARITY fix already exists in fn35_gles.py, but snapshots
+  predate it. ACTION: quarantined snap -> snap_poison_1028_2010,
+  snap_good -> snap_good_poison_1028_2010; next segments boot FRESH in
+  AUTO mode with ALL fixes (arity, weak-guard, wait-guard, TB flush).
+- 2026-10-29T20:12Z FEATURE: snapshot 1:1 persistence — one_seg.sh now
+  uploads a tarball of fn35/snap as asset 'snapshot-latest.tgz' of the
+  GitHub release tag 'snapshots' after every clean segment (background,
+  non-fatal), and restores it when flag .snaprestore is present. Sandbox
+  wipes can no longer lose boot progress.
