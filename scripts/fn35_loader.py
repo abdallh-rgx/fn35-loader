@@ -2106,6 +2106,44 @@ class FNLoader:
                     fp = nxt
             except Exception as e:
                 self.console("[null-call] bt failed %r" % (e,))
+        # ---- garbage-target indirect call (vtable through a corrupt
+        # object -- e.g. the PhysX poison crash at 0xaa0003f4aa0103f3
+        # in __ZTVN5phy). The branch already committed LR (return
+        # address); the engine tolerates null returns from these
+        # virtuals (FWeakObjectPtr precedent: cbz x21 -> ret 0).
+        # Re-enter at LR with x0=0: the bad call becomes a tolerated
+        # null-return instead of a poison crash that kills the chain.
+        try:
+            import struct as _st2
+            lr = self.uc.reg_read(a64.UC_ARM64_REG_LR)
+            looks_garbage = not (0x100000000 <= addr < 0x107000000
+                                 or 0x400000000000 <= addr < 0x800000000000)
+            plausible = (0x100000000 <= lr < 0x107000000
+                         or 0x400000000000 <= lr < 0x800000000000)
+            if looks_garbage and plausible and lr >= 4:
+                w = _st2.unpack("<I", bytes(self.rdb(lr - 4, 4)))[0]
+                is_blr = (w & 0xFFFFFC1F) == 0xD63F0000   # blr xN
+                is_bl = (w & 0xFC000000) == 0x94000000     # bl +imm
+                if is_blr or is_bl:
+                    n = getattr(self, "_n_vtfixes", 0)
+                    if n < 500:
+                        self._n_vtfixes = n + 1
+                        rn = (w >> 5) & 0x1F
+                        regv = self.reg_x(rn) if rn else addr
+                        cn, cs = self.nearest_symbol(lr)
+                        self.console(
+                            "[vt-fix #%d] garbage target 0x%x (x%d=0x%x) "
+                            "-> null-return to lr=0x%x (%s+0x%x)"
+                            % (n + 1, addr, rn, regv, lr,
+                               (cn or "?")[:44], lr - (cs or 0)))
+                        self._dsr_pending = {"kind": "vtreturn",
+                                            "target": lr,
+                                            "pc": self.reg_pc()}
+                        self._fetch_repair = True
+                        self.uc.emu_stop()
+                        return False
+        except Exception as e:
+            self.console("[vt-fix] failed %r" % (e,))
         name, saddr = self.nearest_symbol(addr)
         self.fatal("exec fetch fault at 0x%x (pc=0x%x) in %s+0x%x"
                    % (addr, self.reg_pc(), name or "?",
@@ -2894,6 +2932,20 @@ class FNLoader:
                         except Exception:
                             pass
                         self.console("[desync-fix] applied: pc=0x%x" % t.pc)
+                    elif _dsr["kind"] == "vtreturn":
+                        # garbage-vtable-call repair: return from the bad
+                        # call -- pc=LR (the blr committed it), x0=0
+                        # (null return, the FWeakObjectPtr precedent)
+                        t.pc = _dsr["target"]
+                        t.regs[a64.UC_ARM64_REG_PC] = t.pc
+                        t.regs[a64.UC_ARM64_REG_X0] = 0
+                        try:
+                            self.uc.reg_write(a64.UC_ARM64_REG_PC, t.pc)
+                            self.uc.reg_write(a64.UC_ARM64_REG_X0, 0)
+                        except Exception:
+                            pass
+                        self.console("[vt-fix] applied: null-return, "
+                                     "pc=0x%x" % t.pc)
                     elif _dsr["kind"] == "load":
                         import unicorn.arm64_const as _a
                         c = getattr(_a, "UC_ARM64_REG_"

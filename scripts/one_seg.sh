@@ -68,6 +68,62 @@ if [ ! -f "$EXE" ]; then
 fi
 
 
+# ---- SNAPSHOT PERSIST (1:1 progress rule, extended to snapshots):
+# git ignores fn35/snap (too big) but the snapshot IS the progress.
+# Backup: after every clean segment, tar the snap dir and upload as the
+# 'snapshot-latest' asset of GitHub release tag 'snapshots' (background,
+# non-fatal). Restore: if a fresh-boot was intended but a backup exists
+# (flag file .snaprestore), pull it back instead of rebooting from zero.
+SNAPREL_TAG=snapshots
+SNAP_ASSET=snapshot-latest.tgz
+snap_backup() {
+  ( # background so the segment cadence never waits on the upload
+    SBLOCK=/tmp/fn35_snapup.lock
+    mkdir "$SBLOCK" 2>/dev/null || exit 0
+    trap 'rm -rf "$SBLOCK"' EXIT
+    TOKEN=$(cat /home/z/my-project/.gittoken 2>/dev/null) || exit 0
+    API=https://api.github.com/repos/abdallh-rgx/fn35-loader
+    TGZ=$F35/snapshot-latest.tgz
+    tar czf "$TGZ" -C "$F35" snap 2>/dev/null || exit 0
+    REL=$(curl -sL -H "Authorization: token $TOKEN" "$API/releases/tags/$SNAPREL_TAG")
+    RID=$(echo "$REL" | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('id','') if isinstance(d,dict) else '')" 2>/dev/null)
+    if [ -z "$RID" ]; then
+      RID=$(curl -sL -H "Authorization: token $TOKEN" -X POST \
+        -d "{\"tag_name\":\"$SNAPREL_TAG\",\"name\":\"snapshot backups\"}" \
+        "$API/releases" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+    fi
+    [ -z "$RID" ] && exit 0
+    AID=$(echo "$REL" | python3 -c "import json,sys;d=json.load(sys.stdin);print([a['id'] for a in d.get('assets',[]) if a['name']=='$SNAP_ASSET'][0] if d.get('assets') else '')" 2>/dev/null)
+    [ -n "$AID" ] && curl -sL -X DELETE -H "Authorization: token $TOKEN" "$API/releases/assets/$AID" >/dev/null
+    SZ=$(stat -c%s "$TGZ")
+    curl -sL -H "Authorization: token $TOKEN" \
+      -H "Content-Type: application/octet-stream" \
+      --data-binary @"$TGZ" \
+      "$API/releases/$RID/assets?name=$SNAP_ASSET" >/dev/null
+    echo "[local] snapshot backed up to release '$SNAPREL_TAG' ($SZ bytes) $(date -u +%FT%TZ)" >> "$CONSOLE"
+    rm -f "$TGZ"
+  ) &
+}
+snap_restore() {
+  TOKEN=$(cat /home/z/my-project/.gittoken 2>/dev/null) || return 0
+  API=https://api.github.com/repos/abdallh-rgx/fn35-loader
+  REL=$(curl -sL -H "Authorization: token $TOKEN" "$API/releases/tags/$SNAPREL_TAG")
+  AID=$(echo "$REL" | python3 -c "import json,sys;d=json.load(sys.stdin);print([a['id'] for a in d.get('assets',[]) if a['name']=='$SNAP_ASSET'][0] if d.get('assets') else '')" 2>/dev/null)
+  [ -z "$AID" ] && return 0
+  echo "[local] restoring snapshot from release backup..." | tee -a "$CONSOLE"
+  curl -sL -H "Authorization: token $TOKEN" -H "Accept: application/octet-stream" \
+    "$API/releases/assets/$AID" -o "$F35/snapshot-latest.tgz"
+  if [ -s "$F35/snapshot-latest.tgz" ]; then
+    tar xzf "$F35/snapshot-latest.tgz" -C "$F35" && \
+      echo "[local] snapshot restored: $(python3 -c "import json;d=json.load(open('$F35/snap/index.json'));print(d.get('phase'),d.get('init_index'))" 2>/dev/null)" | tee -a "$CONSOLE"
+    rm -f "$F35/snapshot-latest.tgz"
+  fi
+  rm -f "$F35/.snaprestore"
+}
+if [ -f "$F35/.snaprestore" ] && [ ! -f "$F35/snap/index.json" ]; then
+  snap_restore
+fi
+
 # sync mode is STATE-AWARE: fresh boot (no snapshot) or mid-init-table
 # resume needs AUTO (code mode through init 0-253; loader auto-swaps to
 # block at the portrait milestone). Snapshot past the init table
@@ -130,6 +186,9 @@ else
   echo 0 > "$CRASHES_FILE"
   if [ -f "$F35/snap/index.json" ]; then
     rm -rf "$F35/snap_good"; cp -r "$F35/snap" "$F35/snap_good"
+    # 1:1 snapshot persistence: clean segment -> upload backup to the
+    # GitHub 'snapshots' release (background, non-fatal)
+    snap_backup
   fi
 fi
 ls -t "$F35"/loc_*.log 2>/dev/null | tail -n +21 | xargs -r rm -f
