@@ -1,0 +1,139 @@
+[pakfs] no pak at /home/z/my-project/fn35/extracted/Payload/FortniteClient.app/cookeddata/fortnitegame/content/paks/pakchunkearly-iosclient.pak
+[preinit] fake singleton for 0x10552ea60 (vt=0x510000000040 obj=0x510000000140)
+[native] ___toupper   0x500000f00000 cmp w0, #0x7f; b.hi #0x500000f00020; cmp w0, #0x61; b.lo #0x500000f0001c; cmp w0, #0x7a; b.hi #0x500
+[native] ___tolower   0x500000f00030 cmp w0, #0x7f; b.hi #0x500000f00050; cmp w0, #0x41; b.lo #0x500000f0004c; cmp w0, #0x5a; b.hi #0x500
+[native] _strlen      0x500000f00060 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f00090; mov x9, x0; mov x8, #0; ldrb w10, [x9]; cbz w1
+[native] _memcpy      0x500000f000a0 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f000dc; cmp x1, x10; b.lo #0x500000f000dc; mov x8, x0;
+[native] _memcmp      0x500000f000e0 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f00118; cmp x1, x10; b.lo #0x500000f00118; cbz x2, #0x
+[native] _strcmp      0x500000f00130 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f0016c; cmp x1, x10; b.lo #0x500000f0016c; ldrb w8, [x
+[native] _strncmp     0x500000f00180 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f001bc; cmp x1, x10; b.lo #0x500000f001bc; cbz x2, #0x
+[native] _strchr      0x500000f001d0 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f00200; mov x8, x0; ldrb w9, [x8]; cmp w9, w1; b.eq #0
+[objc] 595 binary classes parsed; root NSObject @0x510000000740
+[dyld] rune table populated (128 entries)
+[gl] 94 GL imports bridged to Mesa/llvmpipe
+[patch] global-shader verify function -> immediate ret (no-op)
+[patch] assert-helper fatal path -> skip (b 0x10136d138)
+[patch] verify-loop missing-detect -> always fine (b 0x1023577fc)
+[weak-guard] 2/2 ObjectIndexToObject caves armed
+[wait-guard] armed: Wait>3600s -> return 0 (cave 0x106000080)
+[sync-hook] auto mode: CODE hook now; swap to BLOCK at portrait milestone
+[MACH-O] mapped 1 segment ranges, 33 sections
+[dyld] filled 1436 GOT slots, applied 15057 binds, 1715 stubs created
+[dyld] 773 module initializers, main at 0x102dae84c
+[snap] pakfs rebuild failed: FileNotFoundError(2, 'No such file or directory')
+[patch] global-shader verify function -> immediate ret (no-op)
+[patch] assert-helper fatal path -> skip (b 0x10136d138)
+[patch] verify-loop missing-detect -> always fine (b 0x1023577fc)
+[weak-guard] 2/2 ObjectIndexToObject caves armed
+[wait-guard] armed: Wait>3600s -> return 0 (cave 0x106000080)
+[snap] restored: 13 regions, 107.6 MB, phase=main, vclock advanced 20.9s past save
+[snap] TB flush deferred to first slice boundary (TLB staleness fix)
+[snap] block re-arm failed: KeyError(99055502106208)
+[fn35] RESUMED from snapshot: /home/z/my-project/fn35/snap
+[run] scheduler start (budget 500s, slice=5000000 instr)
+[lm-trace] TB cache flushed (ctl_flush_tb fast path)
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0x117f8 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 21040M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0x117f8) 0M ready@None [of.MainAppThre pc=0x101839538 __Z21empty_response_to_xmlI42v+0x1187438] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0x118e8 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 21115M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0x118e8) 0M ready@None [of.MainAppThre pc=0x101a9c2bc __Z21empty_response_to_xmlI42v+0x13ea1bc] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[open-proj] '/private/var/containers/Bundle/Application/6B3F2A11-4C4E-4E22-9A04-7D9E1A55C0FF/FortniteClient.app/cookeddata/fortnitegame/fortnitegame.uproject' -> host=/home/z/my-project/fn35/sandbox/Bundle/FortniteClient.app/cookeddata/fortnitegame/fortnitegame.uproject exists=False mk=None flags=0x0
+[open-proj] '/FortniteGame/FortniteGame.uproject' -> host=/home/z/my-project/fn35/sandbox/System/FortniteGame/FortniteGame.uproject exists=False mk=None flags=0x0
+[pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+printf: LogProjectManager: Error: Failed to open descriptor file ../../../FortniteGame/FortniteGame.uproject
+For troubleshooting, please go to https://docs.unrealengine.com/latest/INT/Platforms/iOS/GettingStarted/index.html
+[pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+printf: %s
+[pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+printf: LogInit: Warning: Could not find a valid project file, the engine will exit now.
+[pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+printf: LogInit: Warning: Could not find a valid project file, the engine will exit now.
+[NSLog]
+[pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+printf: LogUObjectGlobals: Warning: Failed to find object 'None None.'
+[pr] lr=0x101e45f34 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0x1793e34)
+printf: LogUObjectGlobals: Warning: Failed to find object 'None None.'
+[null-call] PC=0 caught live: lr=0x1017280e8
+[null-call] thread='of.MainAppThread:' tid=0x1010
+[null-call] sp=0x700000bff9a0
+[null-call] x0=0x700000bff9a8 x1=0x6000000001e8 x2=0x6400003c2300 x3=0x10 x4=0x100fff8b4 x5=0x0 x6=0x4000 x7=0x0 x8=0x6400004672a0
+[null-call] x16=0x500000005200 x17=0x700000bfe8d8
+[null-call] file/log ops (last 40 of 19):
+   ('_opendir', [109951174343776, 109951174343912, 1, 137, 4311742644], 'of.MainAppThread:')
+   ('_host_statistics', [89060441906048, 2, 123145327476256, 123145327476252, 0], 'of.RecordPeakMemory')
+   ('_opendir', [123145314887192, 123145314887219, 1, 28, 4311742644], 'of.MainAppThread:')
+   ('_opendir', [109951174344256, 109951174344390, 1, 135, 4311742644], 'of.MainAppThread:')
+   ('_opendir', [123145314887192, 123145314887217, 1, 26, 4311742644], 'of.MainAppThread:')
+   ('_opendir', [109951174344256, 109951174344386, 1, 131, 4311742644], 'of.MainAppThread:')
+   ('_opendir', [123145314887192, 123145314887213, 1, 22, 4311742644], 'of.MainAppThread:')
+   ('_host_statistics', [89060441906048, 2, 123145319087648, 123145319087644, 0], 'of.RecordPeakMemory')
+   ('_open', [109951174343456, 0, 1, 145, 4311742644], 'of.MainAppThread:', '/private/var/containers/Bundle/Application/6B3F2A11-4C4E-4E22-9A04-7D9E1A55C0FF/FortniteClient.a')
+   ('_open', [123145314888520, 0, 1, 36, 4311742644], 'of.MainAppThread:', '/FortniteGame/FortniteGame.uproject')
+   ('_printf', [4350555760, 109951169617751, 1, 216, 4311742644], 'of.MainAppThread:')
+   ('_printf', [4350555760, 123145314880713, 1, 2, 4311742644], 'of.MainAppThread:')
+   ('_printf', [4350555760, 123145314880936, 1, 81, 4311742644], 'of.MainAppThread:')
+   ('_printf', [4350555760, 123145314880857, 1, 2, 4311742644], 'of.MainAppThread:')
+   ('_NSLog', [4362591184, 14048, 0, 16, 123145314891804], 'of.MainAppThread:')
+   ('_printf', [4350555760, 123145314883526, 1, 63, 4311742644], 'of.MainAppThread:')
+   ('_printf', [4350555760, 123145314883465, 1, 2, 4311742644], 'of.MainAppThread:')
+   ('_host_statistics', [89060441906048, 2, 123145323281952, 123145323281948, 0], 'of.RecordPeakMemory')
+   ('_host_statistics', [89060441906048, 2, 123145335864864, 123145335864860, 0], 'of.RecordPeakMemory')
+[null-call] raw tail 20:
+   ('_pthread_mutex_lock', [4365356392, 4365356392, 178, 4350900330, 123145314874800], 'of.MainAppThread:')
+   ('_pthread_mutex_lock', [105553116267536, 128, 16, 0, 4311742644], 'of.MainAppThread:')
+   ('_pthread_mutex_unlock', [105553116267536, 105553116267512, 109951171372928, 16, 4311742644], 'of.MainAppThread:')
+   ('_bzero', [4365356472, 16, 4, 4, 4311742644], 'of.MainAppThread:')
+   ('_pthread_mutex_lock', [105553116267360, 96, 16, 0, 4311742644], 'of.MainAppThread:')
+   ('_pthread_mutex_unlock', [105553116267360, 105553116267336, 109951171374080, 16, 4311742644], 'of.MainAppThread:')
+   ('_bzero', [4365356552, 16, 4, 4, 4311742644], 'of.MainAppThread:')
+   ('_pthread_mutex_lock', [105553116267536, 128, 16, 0, 4311742644], 'of.MainAppThread:')
+   ('_pthread_mutex_unlock', [105553116267536, 105553116267512, 109951171372928, 16, 4311742644], 'of.MainAppThread:')
+   ('_bzero', [4365356632, 16, 4, 4, 4311742644], 'of.MainAppThread:')
+   ('_pthread_mutex_lock', [105553116268152, 384, 16, 0, 4311742644], 'of.MainAppThread:')
+   ('_pthread_mutex_unlock', [105553116268152, 105553116268128, 109951166719872, 16, 4311742644], 'of.MainAppThread:')
+   ('_bzero', [4365356712, 16, 4, 4, 4311742644], 'of.MainAppThread:')
+   ('_pthread_mutex_lock', [105553116267184, 64, 16, 0, 4311742644], 'of.MainAppThread:')
+   ('_pthread_mutex_unlock', [105553116267184, 105553116267160, 109951171373056, 16, 4311742644], 'of.MainAppThread:')
+   ('_bzero', [109951167969944, 16, 4, 4, 4311742644], 'of.MainAppThread:')
+   ('_pthread_mutex_unlock', [4365356392, 109951170879560, 109951176448128, 4, 4311742644], 'of.MainAppThread:')
+   ('_pthread_getspecific', [8, 123145314892136, 4364644960, 0, 1], 'of.MainAppThread:')
+   ('_pthread_mutex_lock', [105553116267008, 32, 16, 0, 4311742644], 'of.MainAppThread:')
+   ('_pthread_mutex_unlock', [105553116267008, 105553116266984, 109951166718720, 16, 4311742644], 'of.MainAppThread:')
+[null-call] stack scan from sp=0x700000bff9a0:
+[stack +0x158] 0x102346e50 __Z21empty_response_to_xmlI42vx_resp_connect+0x1c94d50
+[stack +0x1b8] 0x10171e77c __Z21empty_response_to_xmlI42vx_resp_connect+0x106c67c
+[stack +0x1e8] 0x1033a7d78 __Z21empty_response_to_xmlI42vx_resp_connect+0x2cf5c78
+[stack +0x1f0] 0x103527c22 __Z21empty_response_to_xmlI42vx_resp_connect+0x2e75b22
+[stack +0x1f8] 0x103452fd2 __Z21empty_response_to_xmlI42vx_resp_connect+0x2da0ed2
+[stack +0x208] 0x105890110 __ZTVN5physx23PxVehicleRepXSerializerINS_16P+0x173c140
+[stack +0x218] 0x102e812cc __Z21empty_response_to_xmlI42vx_resp_connect+0x27cf1cc
+[stack +0x220] 0x1033a7d78 __Z21empty_response_to_xmlI42vx_resp_connect+0x2cf5c78
+[stack +0x230] 0x103335798 __Z21empty_response_to_xmlI42vx_resp_connect+0x2c83698
+[stack +0x258] 0x10550a8a8 __ZTVN5physx23PxVehicleRepXSerializerINS_16P+0x13b68d8
+[stack +0x268] 0x10550a8b8 __ZTVN5physx23PxVehicleRepXSerializerINS_16P+0x13b68e8
+[stack +0x288] 0x100000000 __mh_execute_header+0x0
+[stack +0x300] 0x105606298 __ZTVN5physx23PxVehicleRepXSerializerINS_16P+0x14b22c8
+[stack +0x308] 0x103060ecd __Z21empty_response_to_xmlI42vx_resp_connect+0x29aedcd
+[stack +0x328] 0x103060ecd __Z21empty_response_to_xmlI42vx_resp_connect+0x29aedcd
+[stack +0x330] 0x103096f54 __Z21empty_response_to_xmlI42vx_resp_connect+0x29e4e54
+[stack +0x348] 0x1026e0d18 __Z21empty_response_to_xmlI42vx_resp_connect+0x202ec18
+[stack +0x350] 0x103649c42 __Z21empty_response_to_xmlI42vx_resp_connect+0x2f97b42
+[stack +0x388] 0x101885c24 __Z21empty_response_to_xmlI42vx_resp_connect+0x11d3b24
+[stack +0x3a0] 0x103060ecd __Z21empty_response_to_xmlI42vx_resp_connect+0x29aedcd
+[null-call] 0x1017280d8 mov      x5, x19
+[null-call] 0x1017280dc bl       #0x101218e04
+[null-call] 0x1017280e0 add      x0, sp, #8
+[null-call] 0x1017280e4 blr      x22  <<< THE CALL
+[null-call] 0x1017280e8 add      x0, sp, #8
+[null-call] 0x1017280ec bl       #0x101f482f4
+[null-call] 0x1017280f0 mov      x0, x23
+[null-call] 0x1017280f4 ldp      x29, x30, [sp, #0x1b0]
+[bt  0] 0x10171e77c __Z21empty_response_to_xmlI42vx_resp_connector_s+0x106c67c
+[bt  1] 0x102e812cc __Z21empty_response_to_xmlI42vx_resp_connector_s+0x27cf1cc
+[bt  2] 0x1026e0d18 __Z21empty_response_to_xmlI42vx_resp_connector_s+0x202ec18
+[bt  3] 0x101885c24 __Z21empty_response_to_xmlI42vx_resp_connector_s+0x11d3b24
+[bt  4] 0x520000000004 __ZTVN5physx23PxVehicleRepXSerializerINS_16PxVeh+0x51fefbeac034
+[FATAL] exec fetch fault at 0x0 (pc=0x0) in ?+0x0
+[FATAL] exec fetch fault at 0x0 (pc=0x0) in ?+0x0
+[run] stopped: reason=None fatal='exec fetch fault at 0x0 (pc=0x0) in ?+0x0' exit=None
+[snap] saved 13 regions, 107.9 MB in 1.1s -> /home/z/my-project/fn35/snap_crash
+[fn35] report -> /home/z/my-project/download/fn35/fn35_boot_report.txt

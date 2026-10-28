@@ -1,0 +1,69 @@
+[pakfs] no pak at /home/z/my-project/fn35/extracted/Payload/FortniteClient.app/cookeddata/fortnitegame/content/paks/pakchunkearly-iosclient.pak
+[preinit] fake singleton for 0x10552ea60 (vt=0x510000000040 obj=0x510000000140)
+[native] ___toupper   0x500000f00000 cmp w0, #0x7f; b.hi #0x500000f00020; cmp w0, #0x61; b.lo #0x500000f0001c; cmp w0, #0x7a; b.hi #0x500
+[native] ___tolower   0x500000f00030 cmp w0, #0x7f; b.hi #0x500000f00050; cmp w0, #0x41; b.lo #0x500000f0004c; cmp w0, #0x5a; b.hi #0x500
+[native] _strlen      0x500000f00060 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f00090; mov x9, x0; mov x8, #0; ldrb w10, [x9]; cbz w1
+[native] _memcpy      0x500000f000a0 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f000dc; cmp x1, x10; b.lo #0x500000f000dc; mov x8, x0;
+[native] _memcmp      0x500000f000e0 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f00118; cmp x1, x10; b.lo #0x500000f00118; cbz x2, #0x
+[native] _strcmp      0x500000f00130 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f0016c; cmp x1, x10; b.lo #0x500000f0016c; ldrb w8, [x
+[native] _strncmp     0x500000f00180 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f001bc; cmp x1, x10; b.lo #0x500000f001bc; cbz x2, #0x
+[native] _strchr      0x500000f001d0 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f00200; mov x8, x0; ldrb w9, [x8]; cmp w9, w1; b.eq #0
+[objc] 595 binary classes parsed; root NSObject @0x510000000740
+[dyld] rune table populated (128 entries)
+[gl] 94 GL imports bridged to Mesa/llvmpipe
+[patch] global-shader verify function -> immediate ret (no-op)
+[patch] assert-helper fatal path -> skip (b 0x10136d138)
+[patch] verify-loop missing-detect -> always fine (b 0x1023577fc)
+[weak-guard] 2/2 ObjectIndexToObject caves armed
+[wait-guard] armed: Wait>3600s -> return 0 (cave 0x106000080)
+[sync-hook] auto mode: CODE hook now; swap to BLOCK at portrait milestone
+[MACH-O] mapped 1 segment ranges, 33 sections
+[dyld] filled 1436 GOT slots, applied 15057 binds, 1715 stubs created
+[dyld] 773 module initializers, main at 0x102dae84c
+[snap] pakfs rebuild failed: FileNotFoundError(2, 'No such file or directory')
+[patch] global-shader verify function -> immediate ret (no-op)
+[patch] assert-helper fatal path -> skip (b 0x10136d138)
+[patch] verify-loop missing-detect -> always fine (b 0x1023577fc)
+[weak-guard] 2/2 ObjectIndexToObject caves armed
+[wait-guard] armed: Wait>3600s -> return 0 (cave 0x106000080)
+[snap] restored: 12 regions, 107.6 MB, phase=main, vclock advanced 21.0s past save
+[snap] TB flush deferred to first slice boundary (TLB staleness fix)
+[snap] block re-arm failed: KeyError(99055502106208)
+[fn35] RESUMED from snapshot: /home/z/my-project/fn35/snap
+[run] scheduler start (budget 500s, slice=5000000 instr)
+[lm-trace] TB cache flushed (ctl_flush_tb fast path)
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xd938 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16040M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xd938) 0M ready@None [of.MainAppThre pc=0x1018395c0 __Z21empty_response_to_xmlI42v+0x11874c0] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xda28 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16115M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xda28) 0M ready@None [of.MainAppThre pc=0x101838b74 __Z21empty_response_to_xmlI42v+0x1186a74] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xdb18 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16190M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xdb18) 0M ready@None [of.MainAppThre pc=0x101838b44 __Z21empty_response_to_xmlI42v+0x1186a44] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xdc08 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16265M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xdc08) 0M ready@None [of.MainAppThre pc=0x1018395bc __Z21empty_response_to_xmlI42v+0x11874bc] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xdcf8 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16340M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xdcf8) 0M ready@None [of.MainAppThre pc=0x101839564 __Z21empty_response_to_xmlI42v+0x1187464] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xdde8 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16415M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xdde8) 0M ready@None [of.MainAppThre pc=0x101839564 __Z21empty_response_to_xmlI42v+0x1187464] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xded8 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16490M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xded8) 0M ready@None [of.MainAppThre pc=0x1018395a8 __Z21empty_response_to_xmlI42v+0x11874a8] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xdfc8 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16565M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xdfc8) 0M ready@None [of.MainAppThre pc=0x101838b2c __Z21empty_response_to_xmlI42v+0x1186a2c] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xe0b8 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16640M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xe0b8) 0M ready@None [of.MainAppThre pc=0x1018395ac __Z21empty_response_to_xmlI42v+0x11874ac] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xe1a8 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16715M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xe1a8) 0M ready@None [of.MainAppThre pc=0x101839560 __Z21empty_response_to_xmlI42v+0x1187460] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xe298 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16790M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xe298) 0M ready@None [of.MainAppThre pc=0x101838b50 __Z21empty_response_to_xmlI42v+0x1186a50] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xe388 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16865M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xe388) 0M ready@None [of.MainAppThre pc=0x101838b8c __Z21empty_response_to_xmlI42v+0x1186a8c] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xe478 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 16940M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xe478) 0M ready@None [of.MainAppThre pc=0x1018395cc __Z21empty_response_to_xmlI42v+0x11874cc] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xe568 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 17015M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xe568) 0M ready@None [of.MainAppThre pc=0x101838ce4 __Z21empty_response_to_xmlI42v+0x1186be4] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xe658 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 17090M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xe658) 0M ready@None [of.MainAppThre pc=0x1018394a4 __Z21empty_response_to_xmlI42v+0x11873a4] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[hb] silent 30s: thr='of.RecordPeakMemory' tid=0xe748 pc=0x100fd8d54 (__Z21empty_response_to_xmlI42vx_resp_connect+0x926c54) instr~0M threads={'blocked': 1, 'ready': 5} mapped=0MB/0regions
+[hb] top3: of.MainAppThread:(0x1010) 17165M ready@None; main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.RecordPeakMemory(0xe748) 0M ready@None [of.MainAppThre pc=0x101839588 __Z21empty_response_to_xmlI42v+0x1187488] [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.RecordPeakM pc=0x100fd8d54 __Z21empty_response_to_xmlI42v+0x926c54]
+[run] stopped: reason=budget fatal=None exit=None
+[snap] saved 12 regions, 107.6 MB in 1.1s -> /home/z/my-project/fn35/snap
+[fn35] report -> /home/z/my-project/download/fn35/fn35_boot_report.txt

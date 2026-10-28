@@ -1,0 +1,47 @@
+[gha-chain] start Sun Oct 25 21:14:59 UTC 2026 deadline=Mon Oct 26 02:39:58 UTC 2026
+[gha-chain] 1 rc=0 [run] stopped: reason=None fatal='exec fetch fault at 0x4 (pc=0x4) in ?+0x4' exit=None | 
+[gha-chain] crash #1 -> resumed from crash snapshot
+[gha-chain] 2 rc=0 [run] stopped: reason=None fatal='exec fetch fault at 0x8 (pc=0x8) in ?+0x8' exit=None | 
+[gha-chain] crash #2 -> resumed from crash snapshot
+[gha-chain] 3 rc=0 [run] stopped: reason=None fatal='exec fetch fault at 0xc (pc=0xc) in ?+0xc' exit=None | 
+[gha-chain] crash-loop x3 -> ROLLBACK to last good
+[gha-chain] 4 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 5 rc=0 [run] stopped: reason=budget fatal=None exit=None | didFinishLaunching,
+[gha-chain] 6 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 7 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 8 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 9 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 10 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 11 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 12 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 13 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 14 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 15 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 16 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 17 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 18 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 19 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 20 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 21 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 22 rc=0 [run] stopped: reason=None fatal='exec fetch fault at 0x0 (pc=0x0) in ?+0x0' exit=None | LogInit:,
+[gha-chain] crash #1 -> resumed from crash snapshot
+[gha-chain] 23 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 24 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 25 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 26 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 27 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 28 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 29 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 30 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 31 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 32 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 33 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 34 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 35 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 36 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 37 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 38 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 39 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] 40 rc=0 [run] stopped: reason=budget fatal=None exit=None | 
+[gha-chain] end Mon Oct 26 02:35:06 UTC 2026 reason=deadline
+[local] rc=0 [run] stopped: reason=budget fatal=None exit=None |  | 

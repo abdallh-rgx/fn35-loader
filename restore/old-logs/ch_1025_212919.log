@@ -1,0 +1,182 @@
+[pakfs] no pak at /home/z/my-project/fn35/extracted/Payload/FortniteClient.app/cookeddata/fortnitegame/content/paks/pakchunkearly-iosclient.pak
+[preinit] fake singleton for 0x10552ea60 (vt=0x510000000040 obj=0x510000000140)
+[native] ___toupper   0x500000f00000 cmp w0, #0x7f; b.hi #0x500000f00020; cmp w0, #0x61; b.lo #0x500000f0001c; cmp w0, #0x7a; b.hi #0x500
+[native] ___tolower   0x500000f00030 cmp w0, #0x7f; b.hi #0x500000f00050; cmp w0, #0x41; b.lo #0x500000f0004c; cmp w0, #0x5a; b.hi #0x500
+[native] _strlen      0x500000f00060 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f00090; mov x9, x0; mov x8, #0; ldrb w10, [x9]; cbz w1
+[native] _memcpy      0x500000f000a0 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f000dc; cmp x1, x10; b.lo #0x500000f000dc; mov x8, x0;
+[native] _memcmp      0x500000f000e0 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f00118; cmp x1, x10; b.lo #0x500000f00118; cbz x2, #0x
+[native] _strcmp      0x500000f00130 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f0016c; cmp x1, x10; b.lo #0x500000f0016c; ldrb w8, [x
+[native] _strncmp     0x500000f00180 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f001bc; cmp x1, x10; b.lo #0x500000f001bc; cbz x2, #0x
+[native] _strchr      0x500000f001d0 mov x10, #0x10000; cmp x0, x10; b.lo #0x500000f00200; mov x8, x0; ldrb w9, [x8]; cmp w9, w1; b.eq #0
+[objc] 595 binary classes parsed; root NSObject @0x510000000740
+[dyld] rune table populated (128 entries)
+[gl] 94 GL imports bridged to Mesa/llvmpipe
+[patch] global-shader verify function -> immediate ret (no-op)
+[patch] assert-helper fatal path -> skip (b 0x10136d138)
+[patch] verify-loop missing-detect -> always fine (b 0x1023577fc)
+[weak-guard] 2/2 ObjectIndexToObject caves armed
+[wait-guard] armed: Wait>3600s -> return 0 (cave 0x106000080)
+[sync-hook] auto mode: CODE hook now; swap to BLOCK at portrait milestone
+[MACH-O] mapped 1 segment ranges, 33 sections
+[dyld] filled 1436 GOT slots, applied 15057 binds, 1715 stubs created
+[dyld] 773 module initializers, main at 0x102dae84c
+[snap] pakfs rebuild failed: FileNotFoundError(2, 'No such file or directory')
+[patch] global-shader verify function -> immediate ret (no-op)
+[patch] assert-helper fatal path -> skip (b 0x10136d138)
+[patch] verify-loop missing-detect -> always fine (b 0x1023577fc)
+[weak-guard] 2/2 ObjectIndexToObject caves armed
+[wait-guard] armed: Wait>3600s -> return 0 (cave 0x106000080)
+[snap] restored: 4105 regions, 106.4 MB, phase=inits, vclock advanced 41.6s past save
+[snap] TB flush deferred to first slice boundary (TLB staleness fix)
+[fn35] RESUMED from snapshot: /home/z/my-project/fn35/snap
+[run] scheduler start (budget 500s, slice=5000000 instr)
+[dyld] init 667/773 at 0x103040414
+[dyld] init 668/773 at 0x102fb40c0
+[lm-trace] TB cache flushed (ctl_flush_tb fast path)
+[dyld] init 669/773 at 0x102f6fbc8
+[dyld] init 670/773 at 0x102f898d0
+[dyld] init 671/773 at 0x102eb4abc
+[dyld] init 672/773 at 0x102edead0
+[dyld] init 673/773 at 0x102fe66c4
+[dyld] init 674/773 at 0x102fc8bd8
+[dyld] init 675/773 at 0x102ee80d0
+[dyld] init 676/773 at 0x102ffe044
+[dyld] init 677/773 at 0x102fbd9d8
+[dyld] init 678/773 at 0x102ee8574
+[dyld] init 679/773 at 0x102f28d7c
+[dyld] init 680/773 at 0x102f7de70
+[dyld] init 681/773 at 0x102ffdb98
+[dyld] init 682/773 at 0x102e9ff3c
+[dyld] init 683/773 at 0x10300c3a0
+[dyld] init 684/773 at 0x10304dc78
+[dyld] init 685/773 at 0x102eac694
+[dyld] init 686/773 at 0x102fe8310
+[dyld] init 687/773 at 0x10300b1c8
+[dyld] init 688/773 at 0x102f05c70
+[dyld] init 689/773 at 0x102e87188
+[dyld] init 690/773 at 0x102f23508
+[dyld] init 691/773 at 0x102f3cd48
+[dyld] init 692/773 at 0x102f27c3c
+[dyld] init 693/773 at 0x102fd7994
+[dyld] init 694/773 at 0x102f685d8
+[dyld] init 695/773 at 0x102fa21e0
+[dyld] init 696/773 at 0x102f84498
+[dyld] init 697/773 at 0x102ffe80c
+[dyld] init 698/773 at 0x102fa9c40
+[dyld] init 699/773 at 0x102eee7f8
+[dyld] init 700/773 at 0x102fe58a8
+[dyld] init 701/773 at 0x103004b34
+[dyld] init 702/773 at 0x103034e6c
+[dyld] init 703/773 at 0x102edce64
+[dyld] init 704/773 at 0x102f0113c
+[dyld] init 705/773 at 0x102ee8cd8
+[dyld] init 706/773 at 0x102ec9ee4
+[dyld] init 707/773 at 0x102f43a64
+[dyld] init 708/773 at 0x102fe3258
+[dyld] init 709/773 at 0x102f87c38
+[dyld] init 710/773 at 0x10302bf90
+[dyld] init 711/773 at 0x102fc8ee8
+[dyld] init 712/773 at 0x102fe0a9c
+[dyld] init 713/773 at 0x102fbd70c
+[dyld] init 714/773 at 0x102eca1f4
+[dyld] init 715/773 at 0x102fdb9c0
+[dyld] init 716/773 at 0x102f9078c
+[dyld] init 717/773 at 0x102e9c0c4
+[dyld] init 718/773 at 0x10302e364
+[dyld] init 719/773 at 0x102f75e84
+[dyld] init 720/773 at 0x102fd7cf4
+[dyld] init 721/773 at 0x102f2e774
+[dyld] init 722/773 at 0x102fe8860
+[dyld] init 723/773 at 0x102f6da88
+[dyld] init 724/773 at 0x102e876d0
+[dyld] init 725/773 at 0x102f66d70
+[dyld] init 726/773 at 0x102fdbde8
+[dyld] init 727/773 at 0x102fd41dc
+[dyld] init 728/773 at 0x102e84ad8
+[dyld] init 729/773 at 0x102ed21cc
+[dyld] init 730/773 at 0x102f20a58
+[dyld] init 731/773 at 0x102eeecbc
+[dyld] init 732/773 at 0x102fae724
+[dyld] init 733/773 at 0x102f11c50
+[dyld] init 734/773 at 0x102f809dc
+[dyld] init 735/773 at 0x102f73c84
+[dyld] init 736/773 at 0x102fd11c4
+[dyld] init 737/773 at 0x10304bca0
+[dyld] init 738/773 at 0x102f417c0
+[dyld] init 739/773 at 0x102eb1110
+[dyld] init 740/773 at 0x102eb5038
+[dyld] init 741/773 at 0x102ffecf8
+[dyld] init 742/773 at 0x102eff2b8
+[dyld] init 743/773 at 0x102f546fc
+[dyld] init 744/773 at 0x102ee4c20
+[dyld] init 745/773 at 0x102ec8664
+[dyld] init 746/773 at 0x102ff91dc
+[dyld] init 747/773 at 0x1030588e0
+[dyld] init 748/773 at 0x102f20f28
+[dyld] init 749/773 at 0x102f22800
+[dyld] init 750/773 at 0x102ee25a8
+[dyld] init 751/773 at 0x102f0d80c
+[dyld] init 752/773 at 0x102eb70e0
+[dyld] init 753/773 at 0x102eebcc0
+[dyld] init 754/773 at 0x102f1b968
+[dyld] init 755/773 at 0x102f379ec
+[dyld] init 756/773 at 0x102f2f588
+[dyld] init 757/773 at 0x102ff7858
+[dyld] init 758/773 at 0x102fca364
+[dyld] init 759/773 at 0x102f0ad60
+[dyld] init 760/773 at 0x102f513a0
+[dyld] init 761/773 at 0x102f05cbc
+[dyld] init 762/773 at 0x102ef94c4
+[dyld] init 763/773 at 0x102fb4ee4
+[dyld] init 764/773 at 0x103003c78
+[dyld] init 765/773 at 0x102eda000
+[dyld] init 766/773 at 0x102f4fa98
+[dyld] init 767/773 at 0x102f3bb10
+[dyld] init 768/773 at 0x102ffa998
+[dyld] init 769/773 at 0x102fa8b5c
+[dyld] init 770/773 at 0x102fa03ac
+[dyld] init 771/773 at 0x102f14da0
+[dyld] init 772/773 at 0x102fdc6c0
+[dyld] init 773/773 at 0x102ee0abc
+[dyld] all 773 module initializers returned
+[dyld] cvar rhi.Apple.OpenGLDisabled=0, rhi.Apple.UseMetal=0
+[dyld] entering main() at 0x102dae84c argc=1
+[NSLog]
+[NSLog]
+[uikit] UIApplicationMain(delegate='IOSAppDelegate') cls=0x104138200
+[pr] lr=0x1014ffb10 (__Z21empty_response_to_xmlI42vx_resp_connector_s+0xe4da10)
+[sync-hook] portrait milestone: BLOCK swap armed (will apply at slice boundary)
+printf: ========= This app is in bDeviceInPortraitMode mode
+[sync-hook] swap failed: KeyError(99055502106208)
+[NSTimer] +0.05000000074505806s target=0x6000000413a0 sel=timerForSplashScreen repeats=1
+[NSTimer] +0.10000000149011612s target=0x6000000413a0 sel=RecordPeakMemory repeats=1
+[NSTimer] +0.009999999776482582s target=0x6000000413a0 sel=NoUrlCommandLine repeats=0
+[uikit] didFinishLaunching -> 0x1
+[uikit] main thread parks in run loop
+[hb] silent 30s: thr='of.timerForSplashScreen' tid=0x10f0 pc=0x1010bdbd0 (__Z21empty_response_to_xmlI42vx_resp_connect+0xa0bad0) instr~0M threads={'blocked': 1, 'ready': 4} mapped=0MB/0regions
+[hb] top3: main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.MainAppThread:(0x1010) 80M ready@None; of.timerForSplashScree(0x10f0) 0M ready@None [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.MainAppThre pc=0x101838b80 __Z21empty_response_to_xmlI42v+0x1186a80] [of.timerForSpl pc=0x1010bdbd0 __Z21empty_response_to_xmlI42v+0xa0bad0]
+[hb] silent 30s: thr='of.timerForSplashScreen' tid=0x11e0 pc=0x1010bdbd0 (__Z21empty_response_to_xmlI42vx_resp_connect+0xa0bad0) instr~0M threads={'blocked': 1, 'ready': 4} mapped=0MB/0regions
+[hb] top3: main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.MainAppThread:(0x1010) 155M ready@None; of.timerForSplashScree(0x11e0) 0M ready@None [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.MainAppThre pc=0x101839558 __Z21empty_response_to_xmlI42v+0x1187458] [of.timerForSpl pc=0x1010bdbd0 __Z21empty_response_to_xmlI42v+0xa0bad0]
+[hb] silent 30s: thr='of.timerForSplashScreen' tid=0x12d0 pc=0x1010bdbd0 (__Z21empty_response_to_xmlI42vx_resp_connect+0xa0bad0) instr~0M threads={'blocked': 1, 'ready': 4} mapped=0MB/0regions
+[hb] top3: main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.MainAppThread:(0x1010) 230M ready@None; of.timerForSplashScree(0x12d0) 0M ready@None [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.MainAppThre pc=0x1018394d4 __Z21empty_response_to_xmlI42v+0x11873d4] [of.timerForSpl pc=0x1010bdbd0 __Z21empty_response_to_xmlI42v+0xa0bad0]
+[hb] silent 30s: thr='of.timerForSplashScreen' tid=0x13c0 pc=0x1010bdbd0 (__Z21empty_response_to_xmlI42vx_resp_connect+0xa0bad0) instr~0M threads={'blocked': 1, 'ready': 4} mapped=0MB/0regions
+[hb] top3: main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.MainAppThread:(0x1010) 305M ready@None; of.timerForSplashScree(0x13c0) 0M ready@None [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.MainAppThre pc=0x101839164 __Z21empty_response_to_xmlI42v+0x1187064] [of.timerForSpl pc=0x1010bdbd0 __Z21empty_response_to_xmlI42v+0xa0bad0]
+[hb] silent 30s: thr='of.timerForSplashScreen' tid=0x14b0 pc=0x1010bdbd0 (__Z21empty_response_to_xmlI42vx_resp_connect+0xa0bad0) instr~0M threads={'blocked': 1, 'ready': 4} mapped=0MB/0regions
+[hb] top3: main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.MainAppThread:(0x1010) 380M ready@None; of.timerForSplashScree(0x14b0) 0M ready@None [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.MainAppThre pc=0x1018395cc __Z21empty_response_to_xmlI42v+0x11874cc] [of.timerForSpl pc=0x1010bdbd0 __Z21empty_response_to_xmlI42v+0xa0bad0]
+[hb] silent 30s: thr='of.timerForSplashScreen' tid=0x15a0 pc=0x1010bdbd0 (__Z21empty_response_to_xmlI42vx_resp_connect+0xa0bad0) instr~0M threads={'blocked': 1, 'ready': 4} mapped=0MB/0regions
+[hb] top3: main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.MainAppThread:(0x1010) 455M ready@None; of.timerForSplashScree(0x15a0) 0M ready@None [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.MainAppThre pc=0x10183948c __Z21empty_response_to_xmlI42v+0x118738c] [of.timerForSpl pc=0x1010bdbd0 __Z21empty_response_to_xmlI42v+0xa0bad0]
+[hb] silent 30s: thr='of.timerForSplashScreen' tid=0x1690 pc=0x1010bdbd0 (__Z21empty_response_to_xmlI42vx_resp_connect+0xa0bad0) instr~0M threads={'blocked': 1, 'ready': 4} mapped=0MB/0regions
+[hb] top3: main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.MainAppThread:(0x1010) 530M ready@None; of.timerForSplashScree(0x1690) 0M ready@None [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.MainAppThre pc=0x1018394a4 __Z21empty_response_to_xmlI42v+0x11873a4] [of.timerForSpl pc=0x1010bdbd0 __Z21empty_response_to_xmlI42v+0xa0bad0]
+[hb] silent 30s: thr='of.timerForSplashScreen' tid=0x1780 pc=0x1010bdbd0 (__Z21empty_response_to_xmlI42vx_resp_connect+0xa0bad0) instr~0M threads={'blocked': 1, 'ready': 4} mapped=0MB/0regions
+[hb] top3: main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.MainAppThread:(0x1010) 605M ready@None; of.timerForSplashScree(0x1780) 0M ready@None [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.MainAppThre pc=0x10183947c __Z21empty_response_to_xmlI42v+0x118737c] [of.timerForSpl pc=0x1010bdbd0 __Z21empty_response_to_xmlI42v+0xa0bad0]
+[hb] silent 30s: thr='of.timerForSplashScreen' tid=0x1870 pc=0x1010bdbd0 (__Z21empty_response_to_xmlI42vx_resp_connect+0xa0bad0) instr~0M threads={'blocked': 1, 'ready': 4} mapped=0MB/0regions
+[hb] top3: main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.MainAppThread:(0x1010) 680M ready@None; of.timerForSplashScree(0x1870) 0M ready@None [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.MainAppThre pc=0x1018390f8 __Z21empty_response_to_xmlI42v+0x1186ff8] [of.timerForSpl pc=0x1010bdbd0 __Z21empty_response_to_xmlI42v+0xa0bad0]
+[hb] silent 30s: thr='of.timerForSplashScreen' tid=0x1960 pc=0x1010bdbd0 (__Z21empty_response_to_xmlI42vx_resp_connect+0xa0bad0) instr~0M threads={'blocked': 1, 'ready': 4} mapped=0MB/0regions
+[hb] top3: main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.MainAppThread:(0x1010) 755M ready@None; of.timerForSplashScree(0x1960) 0M ready@None [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.MainAppThre pc=0x1018390fc __Z21empty_response_to_xmlI42v+0x1186ffc] [of.timerForSpl pc=0x1010bdbd0 __Z21empty_response_to_xmlI42v+0xa0bad0]
+[hb] silent 30s: thr='of.timerForSplashScreen' tid=0x1a50 pc=0x1010bdbd0 (__Z21empty_response_to_xmlI42vx_resp_connect+0xa0bad0) instr~0M threads={'blocked': 1, 'ready': 4} mapped=0MB/0regions
+[hb] top3: main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.MainAppThread:(0x1010) 830M ready@None; of.timerForSplashScree(0x1a50) 0M ready@None [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.MainAppThre pc=0x101838b44 __Z21empty_response_to_xmlI42v+0x1186a44] [of.timerForSpl pc=0x1010bdbd0 __Z21empty_response_to_xmlI42v+0xa0bad0]
+[hb] silent 30s: thr='of.timerForSplashScreen' tid=0x1b40 pc=0x1010bdbd0 (__Z21empty_response_to_xmlI42vx_resp_connect+0xa0bad0) instr~0M threads={'blocked': 1, 'ready': 4} mapped=0MB/0regions
+[hb] top3: main(0x1000) 1555M blocked@('forever', 'uikit_runloop'); of.MainAppThread:(0x1010) 905M ready@None; of.timerForSplashScree(0x1b40) 0M ready@None [main pc=0x102db0504 __Z21empty_response_to_xmlI42v+0x26fe404] [of.MainAppThre pc=0x101838b3c __Z21empty_response_to_xmlI42v+0x1186a3c] [of.timerForSpl pc=0x1010bdbd0 __Z21empty_response_to_xmlI42v+0xa0bad0]
+[run] stopped: reason=budget fatal=None exit=None
+[snap] saved 14 regions, 107.6 MB in 1.1s -> /home/z/my-project/fn35/snap
+[fn35] report -> /home/z/my-project/download/fn35/fn35_boot_report.txt
