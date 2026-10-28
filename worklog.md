@@ -945,3 +945,7 @@ MISSION: first frame — never stop. Every segment: push to GitHub.
   so the GH Actions runner died instantly ("missing executable"). Introduced
   FN35_ROOT env (default unchanged locally) in fn35_loader.main() and
   fn35_gles (CAPTURE_DIR + register_gl). Remote run now bootable.
+- 2026-10-29T21:35Z MILESTONE-INFRA: remote GitHub Actions segment ran
+  END-TO-END (binary+snapshot from releases, 530s budget, saved 4108
+  regions / 107.5MB, uploaded back to 'snapshots' release). The grind is
+  now sandbox-proof: local cron every 10 min + remote every 2h.
