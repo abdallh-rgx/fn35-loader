@@ -30,6 +30,44 @@ if ! mkdir "$LOCK" 2>/dev/null; then
 fi
 trap 'rm -rf "$LOCK"' EXIT
 
+# ---- SELF-HEAL: sandbox wipes pip modules between sessions; a missing
+# dep silently burns every 10-min segment (15h lost 2026-10-28). Verify
+# and reinstall BEFORE running the segment.
+if ! python3 -c "import unicorn, capstone" 2>/dev/null; then
+  echo "[local] deps wiped -> reinstalling unicorn+capstone" | tee -a "$CONSOLE"
+  pip install -q unicorn capstone 2>&1 | tail -1 | tee -a "$CONSOLE"
+fi
+if ! python3 -c "from keystone import Ks" 2>/dev/null; then
+  pip uninstall -y -q keystone 2>/dev/null
+  pip install -q keystone-engine 2>&1 | tail -1 | tee -a "$CONSOLE"
+fi
+
+# ---- ASSET-HEAL: the 91MB binary + extracted tree are gitignored (too
+# big for git) but live as a GitHub release asset 'game-assets'. If the
+# sandbox wiped fn35/extracted, restore from the local ipa / release.
+EXE=$F35/extracted/Payload/FortniteClient.app/FortniteClient
+if [ ! -f "$EXE" ]; then
+  echo "[local] binary wiped -> restoring" | tee -a "$CONSOLE"
+  if [ ! -f "$F35/Fortnite35.ipa" ]; then
+    TOKEN=$(cat /home/z/my-project/.gittoken 2>/dev/null)
+    AID=$(curl -sL -H "Authorization: token $TOKEN" \
+      https://api.github.com/repos/abdallh-rgx/fn35-loader/releases | \
+      python3 -c "import json,sys;print([a['id'] for r in json.load(sys.stdin) if r['tag_name']=='game-assets' for a in r['assets']][0])" 2>/dev/null)
+    [ -n "$AID" ] && curl -sL -H "Authorization: token $TOKEN" \
+      -H "Accept: application/octet-stream" \
+      "https://api.github.com/repos/abdallh-rgx/fn35-loader/releases/assets/$AID" \
+      -o "$F35/Fortnite35.ipa"
+  fi
+  if [ -f "$F35/Fortnite35.ipa" ]; then
+    mkdir -p "$F35/extracted"
+    (cd "$F35/extracted" && unzip -q -o ../Fortnite35.ipa)
+    echo "[local] binary restored: $(stat -c%s "$EXE" 2>/dev/null) bytes" | tee -a "$CONSOLE"
+  else
+    echo "[local] FATAL: no IPA available for restore" | tee -a "$CONSOLE"
+  fi
+fi
+
+
 # sync mode is STATE-AWARE: fresh boot (no snapshot) or mid-init-table
 # resume needs AUTO (code mode through init 0-253; loader auto-swaps to
 # block at the portrait milestone). Snapshot past the init table

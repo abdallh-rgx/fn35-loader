@@ -844,3 +844,54 @@ Stage Summary:
   found — sandbox venv wiped, `import unicorn` ModuleNotFoundError at fn35_loader.py:26;
   reinstalled unicorn 2.1.4 + capstone 5.0.7 + z3-solver; loader should resume from
   snap/index.json on next segment
+
+---
+Task ID: session-10 (recovery + hardening, 19:45Z-20:05Z)
+
+DISASTER RECOVERY (the 20-hour rc=1 streak postmortem):
+- WHAT HAPPENED: between 2026-10-28T00:24Z (last successful autosync
+  commit) and 08:13Z the sandbox environment was partially wiped:
+  * pip venv: unicorn/capstone/keystone ALL uninstalled
+  * fn35/extracted/ (91MB binary) DELETED from disk
+  * BUT: git repo intact, snap/ + snap_good/ snapshots intact (they
+    survived on disk, invisible to my first truncated `ls | head`),
+    pak_index.json intact, chain_console.log intact
+- DAMAGE: ~20h of cron segments burned with rc=1 ModuleNotFoundError
+  (every 10 min, silent — no one looked at loc_*.log content)
+- ROOT CAUSE 1 (env): sandbox resets kill pip packages; one_seg.sh had
+  NO dependency guard
+- ROOT CAUSE 2 (assets): the 91MB binary was gitignored (too big for
+  git) with NO on-disk redundancy — a disk wipe = full asset loss
+- ROOT CAUSE 3 (observability): console line "rc=1 | |" was treated
+  as normal for 20h; the traceback was in loc_*.log all along
+
+FIXES SHIPPED (this session):
+1. one_seg.sh SELF-HEAL GUARD: checks `import unicorn, capstone` and
+   `from keystone import Ks` BEFORE each segment; reinstalls on miss.
+   15 hours of dead segments can never happen again.
+2. one_seg.sh ASSET-HEAL: if fn35/extracted binary is missing, restores
+   from local Fortnite35.ipa, else re-downloads from GitHub release
+   'game-assets' (asset id via API, token in .gittoken, 600 perms).
+3. one_seg.sh STATE-AWARE SYNC MODE: fresh boot (no snap) or mid-init
+   resume -> FN35_SYNC_HOOK=auto (code mode for init 0-253, loader
+   auto-swaps to block at portrait milestone); snap with init_index
+   >= 773 -> block (6.5x VM-grind speedup). Before: hardcoded `block`
+   which would desync-crash a fresh boot at init ~253.
+4. IPA REDOWNLOADED from release game-assets (82MB, verified IOS IPA
+   zip store) -> extracted; binary = 91,195,056 bytes (matches known).
+5. .gittoken (chmod 600) + .gitignore entry — asset-restore creds
+   without leaking the token into the repo.
+6. Smoke test PASSED: fresh boot reaches init table (2/773...) with
+   pakfs 3260 entries, 595 ObjC classes, weakobj guard 2/2 armed,
+   auto sync hook armed. Full pipeline green.
+
+STATE AT 20:00Z:
+- one_seg segment LIVE (PID 1301, started 19:56:10Z): RESUMED from
+  snap (init 773/773, phase=main), grinding at ~337B instructions,
+  threads {blocked:14, ready:1}, stub-hb shows healthy pthread churn.
+  Next budget stop ~20:05Z -> snap_good refresh + git mirror push.
+- The phys vtable exec-fetch crash (0xaa0003f4aa0103f3, __ZTVN5phy)
+  remains the deepest crash seen; weakobj guard + crash-PC-change
+  counter reset keep the chain stepping past poison states.
+
+MISSION: first frame — never stop. Every segment: push to GitHub.

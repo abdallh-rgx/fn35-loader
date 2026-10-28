@@ -21,3 +21,4 @@ fn35/*.txt
 fn35/
 downloads_probe/
 fn35/autosync.log
+.gittoken
