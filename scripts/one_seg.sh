@@ -96,11 +96,18 @@ snap_backup() {
     AID=$(echo "$REL" | python3 -c "import json,sys;d=json.load(sys.stdin);print([a['id'] for a in d.get('assets',[]) if a['name']=='$SNAP_ASSET'][0] if d.get('assets') else '')" 2>/dev/null)
     [ -n "$AID" ] && curl -sL -X DELETE -H "Authorization: token $TOKEN" "$API/releases/assets/$AID" >/dev/null
     SZ=$(stat -c%s "$TGZ")
+    # NB: asset UPLOADS go to uploads.github.com (api.github.com rejects
+    # the body with 410/404 silently - the reason the first backup
+    # vanished)
     curl -sL -H "Authorization: token $TOKEN" \
       -H "Content-Type: application/octet-stream" \
       --data-binary @"$TGZ" \
-      "$API/releases/$RID/assets?name=$SNAP_ASSET" >/dev/null
-    echo "[local] snapshot backed up to release '$SNAPREL_TAG' ($SZ bytes) $(date -u +%FT%TZ)" >> "$CONSOLE"
+      "https://uploads.github.com/repos/abdallh-rgx/fn35-loader/releases/$RID/assets?name=$SNAP_ASSET" >/dev/null
+    # verify the asset actually landed (background uploads die silently)
+    VOK=$(curl -sL -H "Authorization: token $TOKEN" \
+      "$API/releases/tags/$SNAPREL_TAG" | \
+      python3 -c "import json,sys;d=json.load(sys.stdin);print(len([a for a in d.get('assets',[]) if a['name']=='$SNAP_ASSET']))" 2>/dev/null)
+    echo "[local] snapshot backed up to release '$SNAPREL_TAG' ($SZ bytes, verified=$VOK) $(date -u +%FT%TZ)" >> "$CONSOLE"
     rm -f "$TGZ"
   ) &
 }
