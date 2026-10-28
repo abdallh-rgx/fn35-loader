@@ -840,3 +840,7 @@ Stage Summary:
 - Rust: 7 crates green (metal, metal-ffi, macho, pakfs, printf,
   paths, cstr); clib str/conv surface fully differential-locked
 - Grind: healthy autonomous rhythm (cron+manual), awaiting LogInit
+- 2026-10-29T19:56Z FIX: root cause of rc=1 streak (00:24Z–19:55Z, ~20 dead segments)
+  found — sandbox venv wiped, `import unicorn` ModuleNotFoundError at fn35_loader.py:26;
+  reinstalled unicorn 2.1.4 + capstone 5.0.7 + z3-solver; loader should resume from
+  snap/index.json on next segment

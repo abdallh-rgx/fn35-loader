@@ -30,11 +30,20 @@ if ! mkdir "$LOCK" 2>/dev/null; then
 fi
 trap 'rm -rf "$LOCK"' EXIT
 
-# past the init table? (any recent log saw didFinishLaunching) -> BLOCK
-# past the init table (init 773/773 + didFinishLaunching done 2026-10-25):
-# BLOCK sync from here on; swap logic lives in the loader (auto) only
-# for fresh boots.
-export FN35_SYNC_HOOK=block
+# sync mode is STATE-AWARE: fresh boot (no snapshot) or mid-init-table
+# resume needs AUTO (code mode through init 0-253; loader auto-swaps to
+# block at the portrait milestone). Snapshot past the init table
+# (init_index>=773) -> BLOCK from segment 1 (6.5x VM-grind speedup).
+if [ -f "$F35/snap/index.json" ]; then
+  INITIDX=$(python3 -c "import json;print(json.load(open('$F35/snap/index.json')).get('init_index',0))" 2>/dev/null || echo 0)
+else
+  INITIDX=0
+fi
+if [ "${INITIDX:-0}" -ge 773 ]; then
+  export FN35_SYNC_HOOK=block
+else
+  export FN35_SYNC_HOOK=auto
+fi
 
 LOG=$F35/loc_$(date +%m%d_%H%M%S).log
 timeout 575 python3 -u fn35_loader.py > "$LOG" 2>&1
