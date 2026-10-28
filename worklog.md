@@ -927,3 +927,9 @@ MISSION: first frame — never stop. Every segment: push to GitHub.
 - MISSION TRACK: next milestones = portrait swap -> LogInit prints ->
   device profiles (fresh run) -> RHI (arity-fixed) -> CoreUObject ->
   Slate -> FIRST FRAME. vt-fix covers the PhysX garbage-vtable class.
+- 2026-10-29T20:50Z FIX segAO: state.pkl persisted _sync_hook_h (a DEAD
+  process hook handle) which clobbered the fresh instance's real handle;
+  restore-time hook_del(stale) raised KeyError(67390848) and BLOCK re-arm
+  silently skipped. Now: handle popped from persisted state + re-arm made
+  stale-handle-tolerant. Fresh boot reached main phase (init 773/773) in
+  ONE segment; MainAppThread alive (0x101838c10..0x1018394b0, pre-LogInit).

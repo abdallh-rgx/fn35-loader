@@ -160,6 +160,12 @@ def save_snapshot(l, snapdir, note=""):
     # dsr repair state: the restore re-arms hooks itself
     for _fl in ("_sync_cb", "_block_cb", "_dsr_pending"):
         state.pop(_fl, None)
+    # hook HANDLES are process-local ints (uc.hook_add return values);
+    # persisting one resurrects a dead handle and a later hook_del on it
+    # raises KeyError -> the BLOCK re-arm silently skips (segAO bug:
+    # KeyError(67390848) in the restore log). The fresh instance's real
+    # handle survives restore and is re-armed/verified below.
+    state.pop("_sync_hook_h", None)
     # the Metal ctypes bridge (CDLL objects cannot be pickled; the
     # restore recreates it lazily via _bridge())
     state.pop("_metal_bridge", None)
@@ -474,9 +480,15 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
     # loader instance above re-armed CODE in auto mode)
     try:
         if getattr(l, "_blk_swap_armed", False) and \
-                getattr(l, "_block_cb", None) is not None and \
-                getattr(l, "_sync_hook_h", None) is not None:
-            l.uc.hook_del(l._sync_hook_h)
+                getattr(l, "_block_cb", None) is not None:
+            _h = getattr(l, "_sync_hook_h", None)
+            if _h is not None:
+                try:
+                    l.uc.hook_del(_h)
+                except Exception:
+                    # stale/foreign handle -- the important part is that
+                    # no double hook remains; verify by re-adding below
+                    pass
             l._sync_hook_h = None
             from unicorn import UC_HOOK_BLOCK
             l._sync_hook_h = l.uc.hook_add(UC_HOOK_BLOCK, l._block_cb)
