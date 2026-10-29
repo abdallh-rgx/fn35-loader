@@ -2356,6 +2356,35 @@ class FNLoader:
                 w = _st2.unpack("<I", bytes(self.rdb(lr - 4, 4)))[0]
                 is_blr = (w & 0xFFFFFC1F) == 0xD63F0000   # blr xN
                 is_bl = (w & 0xFC000000) == 0x94000000     # bl +imm
+                if not (is_blr or is_bl):
+                    # VM-computed dispatch (br xN -- no return address):
+                    # the obfuscated-VM interpreter at 0x102c3d228 reads
+                    # its jump target from VM state; a corrupted index
+                    # sends the fetch into the poison range (all the
+                    # 0x200xxxxxx faults = valid_text + 0xFE000000).
+                    # Repair: return to the interpreter's dispatch loop
+                    # head with x0=0 so the VM re-dispatches from its
+                    # own saved program state (the frame is intact).
+                    vm_lo, vm_hi = 0x102c3d228, 0x102c3e500
+                    fpv = self.uc.reg_read(a64.UC_ARM64_REG_X29)
+                    in_vm = (vm_lo <= lr < vm_hi
+                             or vm_lo <= fpv < vm_hi + 0x1000)
+                    if in_vm and self.cur is not None:
+                        n2 = getattr(self, "_n_vmfixes", 0)
+                        if n2 < 500:
+                            self._n_vmfixes = n2 + 1
+                            self.console(
+                                "[vm-fix #%d] garbage fetch 0x%x "
+                                "lr=0x%x -> re-enter VM dispatch, x0=0"
+                                % (n2, addr, lr))
+                            self._dsr_pending = {
+                                "kind": "vtreturn",
+                                "target": 0x102c3d634,
+                                "pc": self.reg_pc(),
+                            }
+                            self._fetch_repair = True
+                            self.uc.emu_stop()
+                            return False
                 if is_blr or is_bl:
                     n = getattr(self, "_n_vtfixes", 0)
                     if n < 500:
