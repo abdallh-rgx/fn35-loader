@@ -15,6 +15,12 @@ export FN35_BUDGET=${FN35_BUDGET:-530}
 # zero-progress slices on the same wait chain, see worklog) -- keep it
 # out of the scheduler rotation so the VM grind gets the whole CPU.
 export FN35_FREEZE_TIDS=${FN35_FREEZE_TIDS:-8330}
+# 2026-10-30: the spin-breaker force-completes long retry waits after
+# FN35_SPIN_MAX_RETRIES -- it falsely "completed" the async pak-mount
+# wait on the fresh boot (project-file check then failed). The
+# fire-through tick fix already resolves the original deadlock; the
+# breaker stays OFF unless debugging.
+export FN35_SPIN_BREAK=${FN35_SPIN_BREAK:-0}
 export FN35_SNAPSHOT=/home/z/my-project/fn35/snap
 F35=/home/z/my-project/fn35
 CONSOLE=$F35/chain_console.log
