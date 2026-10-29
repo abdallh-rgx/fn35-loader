@@ -2359,6 +2359,7 @@ class FNLoader:
             vm_lo, vm_hi = 0x102c3d228, 0x102c3e500
             # lr inside the interpreter (a blr's return site) OR a frame
             # return address inside it -> the VM owns this fault
+            fpv = 0
             in_vm = vm_lo <= lr < vm_hi
             if not in_vm:
                 try:
