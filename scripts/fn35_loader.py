@@ -3044,14 +3044,24 @@ class FNLoader:
 
     # ================= scheduler ====================================
     def pick_ready(self):
+        freeze = os.environ.get("FN35_FREEZE_TIDS", "")
+        frozen = set()
+        if freeze:
+            try:
+                frozen = {int(x, 16) for x in freeze.split(",")}
+            except Exception:
+                frozen = set()
         n = len(self.order)
         if n == 0:
             return None
         for _ in range(n):
             self.rr = (self.rr + 1) % n
             t = self.threads.get(self.order[self.rr])
-            if t is not None and t.state == "ready":
-                return t
+            if t is None or t.state != "ready":
+                continue
+            if frozen and t.tid in frozen:
+                continue   # env-frozen dead-waiter: keep it out of rotation
+            return t
         return None
 
     def clock_cap(self):
@@ -3217,7 +3227,10 @@ class FNLoader:
                 # until=1 (never reached): a PC=0 branch must FAULT so
                 # on_fetch() can capture the caller live instead of the
                 # silent emu_stop that clobbers the evidence.
-                self.uc.emu_start(t.pc, 1, 2_000_000, self.slice_instr)
+                _slice_timeout = int(1e6 * float(
+                    os.environ.get("FN35_SLICE_TIMEOUT_SECS", "8")))
+                self.uc.emu_start(t.pc, 1, _slice_timeout,
+                                  self.slice_instr)
             except UcError as e:
                 if getattr(self, "_fetch_repair", False):
                     # in-process desync repair in flight: the fetch fault
@@ -3424,6 +3437,14 @@ class FNLoader:
             # wall-paced virtual clock: a slice advances virtual time by
             # exactly what it cost in real time (min 0.1 ms)
             spent = int((time.time() - wall0) * 1e9)
+            # slice pacing probe: which slices burn wall time?
+            if os.environ.get("FN35_SLICE_PROBE"):
+                self._slice_n = getattr(self, "_slice_n", 0) + 1
+                if self._slice_n <= 40 or self._slice_n % 50 == 0:
+                    self.console("[slice] #%d thr=%r wall=%.2fs stop=%s"
+                                 % (self._slice_n, t.name[:16],
+                                    spent / 1e9,
+                                    self.stop_reason))
             cap = self.clock_cap()
             self.vclock = min(self.vclock + max(100_000, spent), cap) \
                 & 0x7FFFFFFFFFFFFFFF

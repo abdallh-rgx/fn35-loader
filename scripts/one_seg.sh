@@ -11,6 +11,10 @@ cd /home/z/my-project/scripts
 export LD_LIBRARY_PATH=/home/z/mesa-debs/root/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 export FN35_SYNC_HOOK=auto
 export FN35_BUDGET=${FN35_BUDGET:-530}
+# 2026-10-30: tid 0x8330 is a proven dead-event waiter (30h+ of
+# zero-progress slices on the same wait chain, see worklog) -- keep it
+# out of the scheduler rotation so the VM grind gets the whole CPU.
+export FN35_FREEZE_TIDS=${FN35_FREEZE_TIDS:-8330}
 export FN35_SNAPSHOT=/home/z/my-project/fn35/snap
 F35=/home/z/my-project/fn35
 CONSOLE=$F35/chain_console.log
