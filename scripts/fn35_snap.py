@@ -170,7 +170,8 @@ def save_snapshot(l, snapdir, note=""):
     # hook ids: a stale one resurrects as "already armed" and silently
     # kills future probe arming (seg_full7-10 forensics bug)
     for _fl in ("_crc_probe_h", "_crc_hits", "_pycase_n",
-                "_trace_armed", "_stub_hb_n"):
+                "_trace_armed", "_stub_hb_n", "_slice_n",
+                "_tramp_diag", "_last_fire_through"):
         state.pop(_fl, None)
     # the Metal ctypes bridge (CDLL objects cannot be pickled; the
     # restore recreates it lazily via _bridge())
