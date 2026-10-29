@@ -2243,10 +2243,29 @@ class FNLoader:
         if self._stub_hb_n >= 200000:
             self._stub_hb_n = 0
             top = self.stub_calls.most_common(6)
-            self.console("[stub-hb] 200k stubs: %s | pc=0x%x thr=%s"
-                         % (", ".join("%s:%d" % (n, c) for n, c in top),
-                            self.reg_pc(),
-                            self.cur.name if self.cur else "?"))
+            # deep stall forensics: which stub, from which call site (LR),
+            # inside which thread body (start pc) + global thread states
+            pc = self.reg_pc()
+            lr = self.uc.reg_read(XREGS[30])
+            stub_nm = self.addr2stub.get(pc - 4, "?")
+            lr_nm, lr_sa = self.nearest_symbol(lr)
+            start_nm, start_sa = (self.nearest_symbol(self.cur.pc)
+                                  if self.cur and self.cur.pc else ("?", 0))
+            states = {}
+            for th in self.threads.values():
+                states[th.state] = states.get(th.state, 0) + 1
+            self.console(
+                "[stub-hb] 200k stubs: %s | pc=0x%x(%s+4) lr=0x%x (%s+0x%x)"
+                " thr=%s tid=0x%x start=0x%x (%s+0x%x) states=%s"
+                % (", ".join("%s:%d" % (n, c) for n, c in top),
+                   pc, stub_nm, lr, (lr_nm or "?")[:40], lr - (lr_sa or 0),
+                   self.cur.name if self.cur else "?",
+                   self.cur.tid if self.cur else 0,
+                   self.cur.pc if self.cur and self.cur.pc else 0,
+                   (start_nm or "?")[:40],
+                   (self.cur.pc - start_sa) if (self.cur and self.cur.pc
+                                                and start_sa) else 0,
+                   states))
             # decay so each report shows the CURRENT storm, not history
             for k in list(self.stub_calls.keys()):
                 self.stub_calls[k] = self.stub_calls[k] // 2
