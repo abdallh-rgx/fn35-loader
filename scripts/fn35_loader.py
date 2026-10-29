@@ -2357,11 +2357,25 @@ class FNLoader:
             # blr/bl path below never matched. The VM interpreter's
             # frame is the reliable trigger.
             vm_lo, vm_hi = 0x102c3d228, 0x102c3e500
-            fpv = self.uc.reg_read(a64.UC_ARM64_REG_X29) \
-                if self.cur is not None else 0
-            in_vm = (vm_lo <= lr < vm_hi or vm_lo <= fpv < vm_hi + 0x1000)
-            if looks_garbage and in_vm and self.cur is not None \
-                    and not plausible:
+            in_vm = False
+            try:
+                fpv = self.uc.reg_read(a64.UC_ARM64_REG_X29) \
+                    if self.cur is not None else 0
+                for _ in range(4):
+                    if not fpv or not (0x100000000 <= fpv
+                                       < 0x800000000000):
+                        break
+                    retv = self.rd64(fpv + 8)
+                    if vm_lo <= retv < vm_hi:
+                        in_vm = True
+                        break
+                    nxt = self.rd64(fpv)
+                    if not nxt or nxt <= fpv:
+                        break
+                    fpv = nxt
+            except Exception:
+                in_vm = False
+            if looks_garbage and in_vm and self.cur is not None:
                 n2 = getattr(self, "_n_vmfixes", 0)
                 if n2 < 2000:
                     self._n_vmfixes = n2 + 1
