@@ -171,7 +171,8 @@ def save_snapshot(l, snapdir, note=""):
     # kills future probe arming (seg_full7-10 forensics bug)
     for _fl in ("_crc_probe_h", "_crc_hits", "_pycase_n",
                 "_trace_armed", "_stub_hb_n", "_slice_n",
-                "_tramp_diag", "_last_fire_through"):
+                "_tramp_diag", "_last_fire_through",
+                "_n_vtfixes", "_n_vmfixes", "_n_desync_fixes"):
         state.pop(_fl, None)
     # the Metal ctypes bridge (CDLL objects cannot be pickled; the
     # restore recreates it lazily via _bridge())
