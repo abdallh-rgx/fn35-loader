@@ -394,6 +394,105 @@ class FNLoader:
                                                    th.pc,
                                                    (nm2 or "?")[:30],
                                                    th.pc - (sa2 or 0))
+                # FP-chain walk for the top thread: identify the guest
+                # loop it is executing (the stub-hb walker only fires
+                # during stub storms; this covers pure-CPU guest loops)
+                try:
+                    fp2 = (th.regs.get(a64.UC_ARM64_REG_X29, 0)
+                           if isinstance(th.regs, dict) else 0) or 0
+                    fr2 = []
+                    fpcur = fp2
+                    for _ in range(3):
+                        if not fpcur or not (0x100000000 <= fpcur
+                                             < 0x800000000000):
+                            break
+                        lr3 = self.rd64(fpcur + 8)
+                        nm3, sa3 = self.nearest_symbol(lr3)
+                        fr2.append("0x%x(%s+0x%x)" % (
+                            lr3, (nm3 or "?")[:26],
+                            lr3 - sa3 if sa3 else 0))
+                        nxt3 = self.rd64(fpcur)
+                        if not nxt3 or nxt3 <= fpcur:
+                            break
+                        fpcur = nxt3
+                    if fr2:
+                        tops += " frames=%s" % " <- ".join(fr2)
+                except Exception:
+                    pass
+                # CRC-loop probe (top3): the UTF-16 CRC-16 walker
+                # 0x100ceb784..b4 or the native tolower block it calls
+                # per char (x19 = walking pointer, callee-saved)
+                pc2 = th.pc or 0
+                if (0x100ceb784 <= pc2 <= 0x100ceb7b8
+                        or 0x500000f00000 <= pc2 < 0x500000f00060):
+                    try:
+                        x19c = (th.regs.get(a64.UC_ARM64_REG_X19, 0)
+                                if isinstance(th.regs, dict) else 0) or 0
+                        if x19c and not getattr(self, "_tramp_diag", False):
+                            self._tramp_diag = True
+                            # decode the Lpy branch at the toupper block
+                            b_insp = struct.unpack("<I", self.rdb(
+                                0x500000f00020, 4))[0]
+                            imm26 = b_insp & 0x3FFFFFF
+                            if imm26 & 0x2000000:
+                                imm26 -= 0x4000000
+                            tgt = 0x500000f00020 + (imm26 << 2)
+                            tgt_ins = struct.unpack("<I", self.rdb(
+                                tgt, 4))[0]
+                            is_svc = (tgt_ins & 0xFFE0001F) == 0xD4000001
+                            idx = (tgt_ins >> 5) & 0xFFFF
+                            nm = self.addr2stub.get(tgt, "MISSING!")
+                            expect = self.stubs.get("___toupper_py")
+                            self.console(
+                                "[tramp] Lpy=0x500000f00020 ins=0x%08x "
+                                "tgt=0x%x tgt_ins=0x%08x svc=%s idx=%d "
+                                "addr2stub=%s stubs[toupper_py]=%s "
+                                "order_len=%d"
+                                % (b_insp, tgt, tgt_ins, is_svc, idx, nm,
+                                   hex(expect) if expect else None,
+                                   len(getattr(self, "stub_order", []))))
+                        if x19c:
+                            raw = self.rdb(x19c - 64, 112)
+                            u16 = [struct.unpack_from("<H", raw, i)[0]
+                                   for i in range(0, 112, 2)]
+                            self.console("[hb] CRC-walk thr=%r ptr=0x%x "
+                                         "back64=%r"
+                                         % (th.name[:14], x19c, u16))
+                    except Exception as _e:
+                        self.console("[hb] CRC-walk probe err %r" % (_e,))
+                    # GLOBAL instruction sampler: every 5M-th guest
+                    # instruction, log pc/regs/thread -- ground truth
+                    # for where the +75M/30s instructions really go
+                    if not getattr(self, "_crc_probe_h", None) \
+                            and self.cur is not None:
+                        try:
+                            self._crc_hits = {"n": 0}
+
+                            def _crc_hook(uc_, addr_, size_, u_):
+                                hh = self._crc_hits
+                                hh["n"] += 1
+                                if hh["n"] % 5000000 != 0:
+                                    return
+                                if hh["n"] > 100000000:
+                                    uc_.hook_del(self._crc_probe_h)
+                                    self._crc_probe_h = None
+                                    return
+                                try:
+                                    nm_ = self.cur.name if self.cur \
+                                        else "?"
+                                    self.console(
+                                        "[isample] n=%d pc=0x%x x0=0x%x "
+                                        "x19=0x%x thr=%s"
+                                        % (hh["n"], addr_, self.reg_x(0),
+                                           self.reg_x(19), nm_[:14]))
+                                except Exception:
+                                    pass
+
+                            self._crc_probe_h = self.uc.hook_add(
+                                UC_HOOK_CODE, _crc_hook)
+                            self.console("[crc-hook] armed")
+                        except Exception as _e:
+                            self.console("[crc-hook] arm err %r" % (_e,))
         if t is not None:
             pc = t.pc
             nm, sa = self.nearest_symbol(pc)
@@ -402,6 +501,23 @@ class FNLoader:
                          % (t.name, t.tid, pc, (nm or "?")[:44],
                             pc - (sa or 0), t.approx_instr // 1000000,
                             states, mapped, nreg))
+            # CRC-loop probe: thread stuck in the UTF-16 CRC-16 walker
+            # (0x100ceb784..b8)? dump the memory it is scanning so the
+            # unterminated-string source can be identified.
+            if (0x100ceb784 <= pc <= 0x100ceb7b8
+                        or 0x500000f00000 <= pc
+                        < 0x500000f00060):
+                try:
+                    x19 = (t.regs.get(a64.UC_ARM64_REG_X19, 0)
+                           if isinstance(t.regs, dict) else 0) or 0
+                    if x19:
+                        raw = self.rdb(x19 - 64, 112)
+                        u16 = [struct.unpack_from("<H", raw, i)[0]
+                               for i in range(0, 112, 2)]
+                        self.console("[hb] CRC-walk ptr=0x%x back64=%r"
+                                     % (x19, u16))
+                except Exception as _e:
+                    self.console("[hb] CRC-walk probe err %r" % (_e,))
         else:
             self.console("[hb] silent 30s: idle scheduler threads=%s "
                          "mapped=%dMB/%dregions" % (states, mapped, nreg))
@@ -1177,8 +1293,8 @@ class FNLoader:
         if not MACH_ABS_STUB:
             self.console("[spin-break] no mach_abs stub yet, skipped")
             return
-        grace_s = float(os.environ.get("FN35_SPIN_GRACE_SECS", "1800"))
-        g = int(grace_s * 1e9)
+        max_retries = int(os.environ.get("FN35_SPIN_MAX_RETRIES",
+                                         "5000000"))
         ks = keystone.Ks(keystone.KS_ARCH_ARM64,
                          keystone.KS_MODE_LITTLE_ENDIAN)
 
@@ -1193,35 +1309,34 @@ class FNLoader:
             return out
 
         # NOTE: cave sits ~83MB from the loop -> cbz/b.cond (±1MB) can
-        # only be used for LOCAL branches; far jumps go via x16 + br
-        # (x16/x17 are AAPCS intra-call scratch, safe to clobber) and
-        # far b/bl are within ±128MB so they encode directly.
+        # only be used for LOCAL branches; far jumps go via x16 + br,
+        # plain `b` (±128MB, both <4GB so keystone encodes them right;
+        # the keystone >4GB truncation bug hit the native Lpy branch).
+        # COUNT-BASED grace: no mach_abs call (a bl to the farm is 343GB
+        # away -- unencodable). Consecutive timed-out Wait returns are
+        # counted in a u32 scratch cell; success resets it.
         lines = []
         lines.append("mov x15, x0")                 # 0x00 keep rc
-        lines += movk_seq(9, SCRATCH)               # 0x04..0x10 x9=&ts0
+        lines += movk_seq(9, SCRATCH)               # 0x04..0x10 x9=&cnt
         lines.append("cbnz x15, 0x%x" % (CAVE + 0x30))   # 0x14 -> tmo
-        lines.append("str xzr, [x9]")               # 0x18 reset ts0
+        lines.append("str wzr, [x9]")               # 0x18 reset cnt
         lines += movk_seq(16, ORIG_CBZ_TGT)         # 0x1c..0x28
         lines.append("br x16")                      # 0x2c -> flag check
-        # 0x30 tmo: ts0 set?
-        lines.append("ldr x10, [x9]")               # 0x30
-        lines.append("cbnz x10, 0x%x" % (CAVE + 0x44))   # 0x34 -> have
-        lines.append("bl 0x%x" % MACH_ABS_STUB)     # 0x38 now
-        lines.append("str x0, [x9]")                # 0x3c ts0 = now
-        lines.append("b 0x%x" % ORIG_RETRY)         # 0x40 far
-        # 0x44 have: elapsed vs grace
-        lines.append("bl 0x%x" % MACH_ABS_STUB)     # 0x44 now
-        lines.append("sub x11, x0, x10")            # 0x48
-        lines += movk_seq(12, g)                    # 0x4c..0x58 grace
-        lines.append("cmp x11, x12")                # 0x5c
-        lines.append("b.lt 0x%x" % (CAVE + 0x88))   # 0x60 -> under
-        lines.append("str xzr, [x9]")               # 0x64 reset
-        lines.append("mov w13, #1")                 # 0x68
-        lines.append("add x14, x19, #0x168")        # 0x6c
-        lines.append("stlr w13, [x14]")             # 0x70 force flag
-        lines += movk_seq(16, ORIG_CBZ_TGT)         # 0x74..0x80
-        lines.append("br x16")                      # 0x84 -> exit loop
-        lines.append("b 0x%x" % ORIG_RETRY)         # 0x88 under grace
+        # 0x30 tmo: cnt++ then compare with threshold
+        lines.append("ldr w10, [x9]")               # 0x30
+        lines.append("add w10, w10, #1")            # 0x34
+        lines.append("str w10, [x9]")               # 0x38
+        lines += movk_seq(11, max_retries, ty="w")  # 0x3c..0x48
+        lines.append("cmp w10, w11")                # 0x4c
+        lines.append("b.hs 0x%x" % (CAVE + 0x5c))   # 0x50 over -> force
+        lines.append("b 0x%x" % ORIG_RETRY)         # 0x54 under, far
+        # 0x5c force-complete the event flag
+        lines.append("str wzr, [x9]")               # 0x5c reset cnt
+        lines.append("mov w13, #1")                 # 0x60
+        lines.append("add x14, x19, #0x168")        # 0x64
+        lines.append("stlr w13, [x14]")             # 0x68 force flag
+        lines += movk_seq(16, ORIG_CBZ_TGT)         # 0x6c..0x78
+        lines.append("br x16")                      # 0x7c -> exit loop
         asm = "\n".join(lines)
         try:
             enc, _ = ks.asm(asm, addr=CAVE)
@@ -1249,8 +1364,8 @@ class FNLoader:
                 except Exception:
                     pass
             self.console("[spin-break] armed: site 0x%x -> cave 0x%x "
-                         "(grace %.0fs, mach_abs 0x%x)"
-                         % (SITE, CAVE, grace_s, MACH_ABS_STUB))
+                         "(max_retries=%d)"
+                         % (SITE, CAVE, max_retries))
         except Exception as e:
             self.console("[spin-break] FAILED: %r" % (e,))
 
@@ -2353,6 +2468,25 @@ class FNLoader:
     def dispatch_stub(self, addr):
         name = self.addr2stub[addr]
         self.stub_calls[name] += 1
+        # one-shot probe: the hybrid toupper/tolower python fallbacks
+        # (non-ASCII UTF-16 chars). Missing IMPL historically returns 0
+        # silently; capture the first calls + every 1M-th to see the
+        # caller and argument pattern (CRC-walk stall forensics).
+        if name in ("___toupper_py", "___tolower_py"):
+            self._pycase_n = getattr(self, "_pycase_n", 0) + 1
+            if self._pycase_n <= 3 or self._pycase_n % 1000000 == 0:
+                try:
+                    lr0 = self.uc.reg_read(XREGS[30])
+                    nm0, sa0 = self.nearest_symbol(lr0)
+                    self.console(
+                        "[pycase] #%d %s x0=0x%x lr=0x%x (%s+0x%x) "
+                        "x19=0x%x x20=0x%x thr=%s"
+                        % (self._pycase_n, name, self.reg_x(0), lr0,
+                           (nm0 or "?")[:40], lr0 - (sa0 or 0),
+                           self.reg_x(19), self.reg_x(20),
+                           self.cur.name if self.cur else "?"))
+                except Exception as _e:
+                    self.console("[pycase] probe err %r" % (_e,))
         # stub-storm heartbeat: the scheduler loop can stall INSIDE one
         # slice for minutes when the guest hammers stubs (mutex waits);
         # the regular heartbeat never gets a slice boundary to fire at.

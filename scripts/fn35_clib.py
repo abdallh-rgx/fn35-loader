@@ -1175,6 +1175,35 @@ def ___toupper(l, c):
     return ord(ch.upper()) if ch.islower() else c & 0xFF
 
 
+# --- unicode fallbacks for the hybrid native trampolines ---------------
+# The native ___toupper/___tolower block branches non-ASCII (>0x7f)
+# UTF-16 chars to these via svc; without an IMPL entry dispatch returns
+# 0 (wrong case, benign) -- but the engine's UTF-16 string handling
+# needs real case mapping for config/asset name lookups.
+@cfunc("___toupper_py")
+def ___toupper_py(l, c):
+    ch = c & 0x10FFFF
+    try:
+        m = chr(ch).upper()
+        if len(m) == 1:
+            return ord(m)
+    except Exception:
+        pass
+    return ch
+
+
+@cfunc("___tolower_py")
+def ___tolower_py(l, c):
+    ch = c & 0x10FFFF
+    try:
+        m = chr(ch).lower()
+        if len(m) == 1:
+            return ord(m)
+    except Exception:
+        pass
+    return ch
+
+
 @cfunc("___isalpha", "_isalpha")
 def _isalpha(l, c):
     return 1 if chr(c & 0xFF).isalpha() else 0

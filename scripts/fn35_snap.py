@@ -166,6 +166,12 @@ def save_snapshot(l, snapdir, note=""):
     # KeyError(67390848) in the restore log). The fresh instance's real
     # handle survives restore and is re-armed/verified below.
     state.pop("_sync_hook_h", None)
+    # diagnostic probe handles/handles-in-progress are process-local UC
+    # hook ids: a stale one resurrects as "already armed" and silently
+    # kills future probe arming (seg_full7-10 forensics bug)
+    for _fl in ("_crc_probe_h", "_crc_hits", "_pycase_n",
+                "_trace_armed", "_stub_hb_n"):
+        state.pop(_fl, None)
     # the Metal ctypes bridge (CDLL objects cannot be pickled; the
     # restore recreates it lazily via _bridge())
     state.pop("_metal_bridge", None)
@@ -416,6 +422,21 @@ def load_snapshot(snapdir, macho_path, sandbox, budget=600.0, trace_n=0,
         l.apply_code_patches()
     except Exception as _e:
         l.console("[snap] code patch re-apply failed: %r" % (_e,))
+    # RE-PLACE the native stub blocks too: the overlay also restores the
+    # OLD native-blob bytes (and the Lpy trampoline keystone bug fix of
+    # 2026-10-30 lives there). build_native_stubs() re-uses the loaded
+    # farm addresses (make_svc_stub is idempotent) and re-writes the
+    # blob with the CURRENT assembler output.
+    try:
+        from fn35_native import build_native_stubs as _bns
+        _bns(l)
+        try:
+            l.uc.ctl_remove_cache(0x500000f00000, 0x500000f00000 + 0x10000)
+        except Exception:
+            pass
+        l.console("[snap] native stubs re-placed")
+    except Exception as _e:
+        l.console("[snap] native re-place failed: %r" % (_e,))
     # derived cache: stale entries from older snapshots can mis-call
     # implementations that gained real signatures since (see the
     # _sched_yield TypeError storm in segAR)

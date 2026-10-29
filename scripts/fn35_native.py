@@ -11,6 +11,7 @@ with zero Python involvement.
 Semantics mirror fn35_clib's versions (ASCII-only fast paths).
 """
 import capstone
+import struct
 
 try:
     from keystone import Ks, KS_ARCH_ARM64, KS_MODE_LITTLE_ENDIAN
@@ -199,7 +200,15 @@ def build_native_stubs(loader):
         loader.native_trampolines = getattr(loader, "native_trampolines", {})
         # register the python fallback name so dispatch_stub resolves it
         loader.addr2stub[svc] = py_name
-        place(name, """
+        # KEYSTONE FAR-BRANCH BUG: place() assembles with ks.asm(src)
+        # WITHOUT addr= (PC=0), so `b 0x500000000000` truncates to 32
+        # bits and became `b block_start` -- every non-ASCII char spun
+        # the native block forever (the 2026-10-30 MainAppThread CRC
+        # stall). Assemble the body with a nop at Lpy, then hand-encode
+        # the far branch to the farm svc stub (imm26 fits: 3.9M instrs
+        # < 33.5M range).
+        addr = NATIVE_BASE + len(code)
+        body = """
             cmp   w0, #127
             b.hi  Lpy
             cmp   w0, #%d
@@ -208,8 +217,23 @@ def build_native_stubs(loader):
             b.hi  Lret
             %s
         Lret: ret
-        Lpy: b     0x%x
-        """ % (lo, hi, sub, svc))
+        Lpy:  nop
+        """ % (lo, hi, sub)
+        blob = bytearray(bytes(_KS.asm(body)[0]))
+        lpy_off = len(blob) - 4
+        off_i = (svc - (addr + lpy_off)) >> 2
+        if not (-(1 << 25) <= off_i < (1 << 25)):
+            raise RuntimeError("hybrid %s Lpy branch out of range: %d"
+                               % (name, off_i))
+        b_ins = 0x14000000 | (off_i & 0x3FFFFFF)
+        blob[lpy_off:lpy_off + 4] = struct.pack("<I", b_ins)
+        txt = "; ".join("%s %s" % (i.mnemonic, i.op_str)
+                        for i in CS.disasm(bytes(blob), addr))
+        loader.console("[native] %-12s 0x%x %s" % (name, addr, txt[:100]))
+        out[name] = addr
+        code.extend(blob)
+        while len(code) % 16:
+            code.extend(b"\x1f\x20\x03\xd5")      # nop
 
     for name, src in NATIVES.items():
         if name in out or name.lstrip("_") in disabled:
