@@ -2352,6 +2352,31 @@ class FNLoader:
                                  or 0x400000000000 <= addr < 0x800000000000)
             plausible = (0x100000000 <= lr < 0x107000000
                          or 0x400000000000 <= lr < 0x800000000000)
+            # VM-dispatch repair FIRST (independent of LR plausibility):
+            # the fatal 0x200871540 fetch had an implausible LR, so the
+            # blr/bl path below never matched. The VM interpreter's
+            # frame is the reliable trigger.
+            vm_lo, vm_hi = 0x102c3d228, 0x102c3e500
+            fpv = self.uc.reg_read(a64.UC_ARM64_REG_X29) \
+                if self.cur is not None else 0
+            in_vm = (vm_lo <= lr < vm_hi or vm_lo <= fpv < vm_hi + 0x1000)
+            if looks_garbage and in_vm and self.cur is not None \
+                    and not plausible:
+                n2 = getattr(self, "_n_vmfixes", 0)
+                if n2 < 2000:
+                    self._n_vmfixes = n2 + 1
+                    self.console(
+                        "[vm-fix #%d] garbage fetch 0x%x lr=0x%x fp=0x%x"
+                        " -> re-enter VM dispatch, x0=0"
+                        % (n2, addr, lr, fpv))
+                    self._dsr_pending = {
+                        "kind": "vtreturn",
+                        "target": 0x102c3d634,
+                        "pc": self.reg_pc(),
+                    }
+                    self._fetch_repair = True
+                    self.uc.emu_stop()
+                    return False
             if looks_garbage and plausible and lr >= 4:
                 w = _st2.unpack("<I", bytes(self.rdb(lr - 4, 4)))[0]
                 is_blr = (w & 0xFFFFFC1F) == 0xD63F0000   # blr xN
