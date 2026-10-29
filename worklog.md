@@ -74,3 +74,14 @@
 - RESULT (530s segment): of.MainAppThread +1,120M instr = 2.1M/s
   sustained, up from ~75k/s. VM interpreter frames stable, engine not
   logging yet — the 13MB VM bytecode grind continues at 28x speed.
+
+### 2026-10-30 15:30-16:40Z — VM grind status (segments seg_fix7..11)
+- Steady +1.1-1.2B instructions per 530s segment at 2.1-2.3M instr/s.
+- VM interpreter frames stable (0x1029b30f0 <- 0x10256aa68 <- 0x102e814f0):
+  the obfuscated-VM dispatch loop is healthy and grinding.
+- Snapshot ~117MB, verified, uploaded each segment; git mirror synced.
+- Cron Job 478173 now carries FN35_FREEZE_TIDS=8330 via one_seg.sh, so
+  every future segment runs at full VM throughput automatically.
+- Next milestones to watch: engine console output (first LogInit/NSLog
+  lines), new thread creations (render/RHI threads), screenshots in
+  download/fn35/screenshots/.
