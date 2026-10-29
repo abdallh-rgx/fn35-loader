@@ -99,3 +99,14 @@
 - on_fetch: added VM-dispatch repair (garbage br-style fetches from
   the VM interpreter re-enter the dispatch loop; repair counters no
   longer persist via snapshot; caps env-tunable).
+
+### 2026-10-30 ~19:00Z — FIRST-EVER LogPakFile mount milestone on fresh boot
+- Spin-breaker disabled (it force-completed the pak-mount wait ->
+  premature "Could not find a valid project file" exit).
+- Clean fresh boot (no snapshot): init 767/773 seg1, portrait
+  milestone seg2, and seg4 reached:
+  `LogPakFile: Display: Found Pak file
+   ../../../FortniteGame/Content/Paks/pakchunkearly-iosclient.pak
+   attempting to mount.`  <-- NEVER reached in the old 30h chain
+- of.MainAppThread executing clean engine code
+  (0x1012b40a8 <- 0x1018c23cc <- 0x102cfa618). No crashes, no poison.
