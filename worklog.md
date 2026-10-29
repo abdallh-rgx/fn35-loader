@@ -85,3 +85,17 @@
 - Next milestones to watch: engine console output (first LogInit/NSLog
   lines), new thread creations (render/RHI threads), screenshots in
   download/fn35/screenshots/.
+
+### 2026-10-30 ~17:30Z — FRESH BOOT with all fixes: clean state, fast phases
+- The corrupt snapshot (VM state poisoned by deadlock-era forced
+  repairs) hit 103k vt-fix repairs then deterministic poison fetches.
+  Preserved as snap_corrupt_20261030; chain restarted FRESH.
+- Fresh boot results (all fixes active):
+  * init table 767/773 in the FIRST segment (was: never completed)
+  * bDeviceInPortraitMode + BLOCK swap + portrait milestone in seg 2
+  * of.MainAppThread (engine game thread) executing real engine init
+    (pc 0x101838xxx-0x101839xxx), splash timer firing 20x/s clean
+  * no garbage calls, no poison fetches, no stub storms
+- on_fetch: added VM-dispatch repair (garbage br-style fetches from
+  the VM interpreter re-enter the dispatch loop; repair counters no
+  longer persist via snapshot; caps env-tunable).
