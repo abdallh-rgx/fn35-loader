@@ -2444,6 +2444,27 @@ class FNLoader:
                         return False
         except Exception as e:
             self.console("[vt-fix] failed %r" % (e,))
+        # pre-fatal forensics: why did the VM/repair gates not fire?
+        try:
+            lr_ = self.uc.reg_read(a64.UC_ARM64_REG_LR)
+            fp_ = self.uc.reg_read(a64.UC_ARM64_REG_X29)
+            frs = []
+            f2 = fp_
+            for _ in range(4):
+                if not f2 or not (0x100000000 <= f2 < 0x800000000000):
+                    break
+                r2 = self.rd64(f2 + 8)
+                frs.append("0x%x" % r2)
+                nx2 = self.rd64(f2)
+                if not nx2 or nx2 <= f2:
+                    break
+                f2 = nx2
+            self.console(
+                "[pre-fatal] addr=0x%x lr=0x%x fp=0x%x frames=%s cur=%r"
+                % (addr, lr_, fp_, frs,
+                   self.cur.name if self.cur else None))
+        except Exception:
+            pass
         name, saddr = self.nearest_symbol(addr)
         self.fatal("exec fetch fault at 0x%x (pc=0x%x) in %s+0x%x"
                    % (addr, self.reg_pc(), name or "?",
