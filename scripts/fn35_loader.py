@@ -1069,6 +1069,7 @@ class FNLoader:
         # dynamic keystone-assembled guards (need a code cave)
         self.install_weakobj_guard()
         self.install_event_wait_guard()
+        self.install_spin_breaker()
 
     def install_event_wait_guard(self):
         """FGraphEvent-style Wait deadlock breaker.
@@ -1136,6 +1137,122 @@ class FNLoader:
                          "(cave 0x%x)" % CAVE)
         except Exception as e:
             self.console("[wait-guard] FAILED: %r" % (e,))
+
+    def install_spin_breaker(self):
+        """Engine 'wait for completion flag' loop stall breaker.
+
+        Loop at 0x101bc5da0:
+            while (!atomic_load(this+0x168)) {
+                rc = event(this+0x148)->Wait(INFINITE, 0);  // vt+0x20
+                if (rc != 0) retry_handler();               // 0x1023bf3b4
+            }
+        After the deadlock-valve converts a forever-cond wait into an
+        FEvent TIMEOUT (state +0x14 = 2), Wait() returns 1 IMMEDIATELY
+        on every call (fast path 0x102c526ac; verified by FP-walk:
+        spin frames pass through 0x102bf9498). The engine then retries
+        forever at ~40k/s: 8 ready threads, zero progress, every
+        segment burns its whole budget spinning (the 2026-10-29/30
+        24h 'budget' stall).
+
+        Patch: replace the cbz at 0x101bc5dcc with a branch to a cave
+        that resets a scratch timestamp whenever Wait SUCCEEDS, and
+        when timed-out retries persist > FN35_SPIN_GRACE_SECS (default
+        1800) of guest vclock, force-stores 1 to this+0x168 so the
+        flag check exits and boot continues. Legit long waits that DO
+        complete (pak mount, splash timers) reset the scratch on
+        success and are untouched."""
+        if os.environ.get("FN35_SPIN_BREAK", "1") != "1":
+            return
+        try:
+            import keystone
+        except ImportError:
+            self.console("[spin-break] keystone missing, skipped")
+            return
+        SITE = 0x101bc5dcc          # cbz w0, 0x101bc5dd8  (after Wait)
+        ORIG_CBZ_TGT = 0x101bc5dd8  # flag recheck / loop exit
+        ORIG_RETRY = 0x101bc5dd0    # mov x0,x19; bl retry_handler
+        CAVE = 0x106001000          # dedicated page (WEAKOBJ_CAVE+1 page)
+        SCRATCH = CAVE + 0xF0       # 8 bytes: ts0 of first timed-out Wait
+        MACH_ABS_STUB = self.stubs.get("_mach_absolute_time")
+        if not MACH_ABS_STUB:
+            self.console("[spin-break] no mach_abs stub yet, skipped")
+            return
+        grace_s = float(os.environ.get("FN35_SPIN_GRACE_SECS", "1800"))
+        g = int(grace_s * 1e9)
+        ks = keystone.Ks(keystone.KS_ARCH_ARM64,
+                         keystone.KS_MODE_LITTLE_ENDIAN)
+
+        def movk_seq(reg, val, ty="x"):
+            """4-instruction movz/movk 64-bit immediate load."""
+            out = []
+            halves = [(val >> sh) & 0xFFFF for sh in (0, 16, 32, 48)]
+            out.append("movz %s%d, #0x%x" % (ty, reg, halves[0]))
+            for i, h in enumerate(halves[1:], start=1):
+                out.append("movk %s%d, #0x%x, lsl #%d"
+                           % (ty, reg, h, i * 16))
+            return out
+
+        # NOTE: cave sits ~83MB from the loop -> cbz/b.cond (±1MB) can
+        # only be used for LOCAL branches; far jumps go via x16 + br
+        # (x16/x17 are AAPCS intra-call scratch, safe to clobber) and
+        # far b/bl are within ±128MB so they encode directly.
+        lines = []
+        lines.append("mov x15, x0")                 # 0x00 keep rc
+        lines += movk_seq(9, SCRATCH)               # 0x04..0x10 x9=&ts0
+        lines.append("cbnz x15, 0x%x" % (CAVE + 0x30))   # 0x14 -> tmo
+        lines.append("str xzr, [x9]")               # 0x18 reset ts0
+        lines += movk_seq(16, ORIG_CBZ_TGT)         # 0x1c..0x28
+        lines.append("br x16")                      # 0x2c -> flag check
+        # 0x30 tmo: ts0 set?
+        lines.append("ldr x10, [x9]")               # 0x30
+        lines.append("cbnz x10, 0x%x" % (CAVE + 0x44))   # 0x34 -> have
+        lines.append("bl 0x%x" % MACH_ABS_STUB)     # 0x38 now
+        lines.append("str x0, [x9]")                # 0x3c ts0 = now
+        lines.append("b 0x%x" % ORIG_RETRY)         # 0x40 far
+        # 0x44 have: elapsed vs grace
+        lines.append("bl 0x%x" % MACH_ABS_STUB)     # 0x44 now
+        lines.append("sub x11, x0, x10")            # 0x48
+        lines += movk_seq(12, g)                    # 0x4c..0x58 grace
+        lines.append("cmp x11, x12")                # 0x5c
+        lines.append("b.lt 0x%x" % (CAVE + 0x88))   # 0x60 -> under
+        lines.append("str xzr, [x9]")               # 0x64 reset
+        lines.append("mov w13, #1")                 # 0x68
+        lines.append("add x14, x19, #0x168")        # 0x6c
+        lines.append("stlr w13, [x14]")             # 0x70 force flag
+        lines += movk_seq(16, ORIG_CBZ_TGT)         # 0x74..0x80
+        lines.append("br x16")                      # 0x84 -> exit loop
+        lines.append("b 0x%x" % ORIG_RETRY)         # 0x88 under grace
+        asm = "\n".join(lines)
+        try:
+            enc, _ = ks.asm(asm, addr=CAVE)
+            body = bytes(enc)
+        except Exception as e:
+            self.console("[spin-break] ASSEMBLY FAILED: %r (asm=%s)"
+                         % (e, asm[:400]))
+            return
+        if len(body) > 0xF0:
+            self.console("[spin-break] cave overflow %d bytes" % len(body))
+            return
+        try:
+            try:
+                self.uc.mem_map(CAVE, 0x1000, 7)
+            except UcError:
+                pass
+            self.wrb(CAVE, body)
+            red, _ = ks.asm("b 0x%x" % CAVE, addr=SITE)
+            self.wrb(SITE, bytes(red))
+            # unicorn TB-cache invalidation on BOTH pages (stale TBs
+            # silently keep executing the original bytes otherwise)
+            for lo in (SITE & ~0xFFF, CAVE & ~0xFFF):
+                try:
+                    self.uc.ctl_remove_cache(lo, lo + 0x1000)
+                except Exception:
+                    pass
+            self.console("[spin-break] armed: site 0x%x -> cave 0x%x "
+                         "(grace %.0fs, mach_abs 0x%x)"
+                         % (SITE, CAVE, grace_s, MACH_ABS_STUB))
+        except Exception as e:
+            self.console("[spin-break] FAILED: %r" % (e,))
 
     # ---- FWeakObjectPtr poison guard --------------------------------
     # ObjectIndexToObject() has TWO identical clones
@@ -2254,6 +2371,14 @@ class FNLoader:
             states = {}
             for th in self.threads.values():
                 states[th.state] = states.get(th.state, 0) + 1
+            blw = []
+            rdy = []
+            for th in self.threads.values():
+                if th.state == "blocked" and th.wait:
+                    blw.append("%r:%s:%r" % (th.name[:10], th.wait[0],
+                                             str(th.wait[1])[:12]))
+                elif th.state == "ready" and th.pc:
+                    rdy.append("0x%x" % th.pc)
             self.console(
                 "[stub-hb] 200k stubs: %s | pc=0x%x(%s+4) lr=0x%x (%s+0x%x)"
                 " thr=%s tid=0x%x start=0x%x (%s+0x%x) states=%s"
@@ -2266,6 +2391,29 @@ class FNLoader:
                    (self.cur.pc - start_sa) if (self.cur and self.cur.pc
                                                 and start_sa) else 0,
                    states))
+            self.console("[stub-hb] blocked: %s | ready-pcs: %s"
+                         % (blw[:4] or "-", rdy[:4]))
+            # FP-chain walk (x29 frames): who calls the spin loop?
+            try:
+                fp = self.uc.reg_read(a64.UC_ARM64_REG_X29)
+                fr = []
+                for _ in range(5):
+                    if not fp or not (0x100000000 <= fp
+                                      < 0x800000000000):
+                        break
+                    lr2 = self.rd64(fp + 8)
+                    nm2, sa2 = self.nearest_symbol(lr2)
+                    fr.append("0x%x(%s+0x%x)" % (
+                        lr2, (nm2 or "?")[:34],
+                        lr2 - sa2 if sa2 else 0))
+                    nxt = self.rd64(fp)
+                    if not nxt or nxt <= fp:
+                        break
+                    fp = nxt
+                if fr:
+                    self.console("[stub-hb] frames: %s" % " <- ".join(fr))
+            except Exception:
+                pass
             # decay so each report shows the CURRENT storm, not history
             for k in list(self.stub_calls.keys()):
                 self.stub_calls[k] = self.stub_calls[k] // 2
@@ -2873,6 +3021,22 @@ class FNLoader:
                     continue
                 self.stop_reason = "budget"
                 break
+            # FIRE-THROUGH: ObjC timers / display links must fire even when
+            # worker threads are READY. The old gate (tick only on the idle
+            # path, i.e. pick_ready()==None) deadlocked the whole system:
+            # 8 ready pthreads spin in FEvent/cond state-polls waiting for
+            # the runloop tick, main is parked 'forever' in uikit_runloop,
+            # and the CADisplayLink/NSTimer callbacks (the frame driver)
+            # never get scheduled -> zero progress, budget-out every seg.
+            # Wall-throttled to 2ms; each fire spawns a fresh guest thread
+            # (safe: _fire_native only queues a thread, runs nothing here).
+            _w = time.time()
+            if _w - getattr(self, "_last_fire_through", 0.0) >= 0.002:
+                self._last_fire_through = _w
+                try:
+                    self.objc.tick()
+                except Exception as _e:
+                    self.warn("objc.tick: %r" % (_e,))
             t = self.pick_ready()
             if t is None:
                 # fire due ObjC timers / display links (spawns threads)
