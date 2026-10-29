@@ -38,3 +38,26 @@
 - **Result**: stub storm GONE (0 stub-hb in 240s run); of.MainAppThread
   executing (+45..75M instr/30s); of.RecordPeakMemory threads spawn/exit.
 - Commit: 7d1797a (pushed).
+
+### 2026-10-30 ~13:30Z — KEYSTONE >4GB FAR-BRANCH BUG FOUND + FIXED (the real spinner)
+- `place()` in fn35_native.py assembles with `ks.asm(src)` WITHOUT addr=
+  (PC=0) -> absolute branch `Lpy: b 0x500000000000` (15MB beyond PC,
+  >4GB absolute) truncated by keystone into `b block_start`
+  (0x17fffff8) -> **every non-ASCII UTF-16 char spun the native
+  toupper block forever**. The engine's MainAppThread (game loop, fired
+  via [IOSAppDelegate MainAppThread:]) was CRC-16-ing a UTF-16 string
+  and froze on the first non-ASCII char (x19 static at 0x700000bff8f2).
+- Forensics that cracked it: Lpy branch decode from live snapshot
+  memory (`[tramp]` diag) + one-shot `___toupper_py` SVC probe.
+- Fixes (commit 373a92c):
+  1. fn35_native.py: hybrid trampolines assembled as body + MANUALLY
+     encoded imm26 far branch (3.9M instr offsets, in ±33.5M range).
+  2. fn35_snap.py: restore path now RE-PLACES native stubs after the
+     region overlay (the overlay had been resurrecting the old broken
+     bytes on every resume) + TB cache invalidate.
+  3. fn35_clib.py: real unicode case fallbacks ___toupper_py/___tolower_py.
+  4. spin-breaker cave rewritten count-based (no unencodable 343GB bl);
+     snapshot pickle no longer persists probe handles (_crc_probe_h etc.).
+- RESULT: pycase fires, CRC pointer ADVANCES (0x…f8f2 -> f8f4 -> f8f6),
+  MainAppThread EXITED the CRC loop into new code
+  (frames 0x1029b30f0 <- 0x10256aa68 <- 0x102e814f0), snapshot +0.3MB.
