@@ -2430,7 +2430,7 @@ class FNLoader:
                             return False
                 if is_blr or is_bl:
                     n = getattr(self, "_n_vtfixes", 0)
-                    if n < 500:
+                    if n < int(os.environ.get("FN35_VTFIX_CAP", "50000")):
                         self._n_vtfixes = n + 1
                         rn = (w >> 5) & 0x1F
                         regv = self.reg_x(rn) if rn else addr
