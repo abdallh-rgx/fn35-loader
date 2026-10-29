@@ -61,3 +61,16 @@
 - RESULT: pycase fires, CRC pointer ADVANCES (0x…f8f2 -> f8f4 -> f8f6),
   MainAppThread EXITED the CRC loop into new code
   (frames 0x1029b30f0 <- 0x10256aa68 <- 0x102e814f0), snapshot +0.3MB.
+
+### 2026-10-30 ~14:40Z — VM-grind throughput: 28x (75k -> 2.1M instr/s)
+- Slice pacing probe (`FN35_SLICE_PROBE=1`): MainApp/pthread slices end
+  at the 5M-instruction count (~2.2s at VM speed), NOT the 2s timeout;
+  the pthread 0x8330 burned half the wall time on 2s no-progress turns.
+- Fixes (commit series):
+  1. `FN35_FREEZE_TIDS=8330` (one_seg.sh default): the proven
+     dead-event waiter is skipped by pick_ready; the obfuscated-VM
+     interpreter thread (of.MainAppThread) now gets the whole CPU.
+  2. `FN35_SLICE_TIMEOUT_SECS` env (default 8s) for the emu_start cap.
+- RESULT (530s segment): of.MainAppThread +1,120M instr = 2.1M/s
+  sustained, up from ~75k/s. VM interpreter frames stable, engine not
+  logging yet — the 13MB VM bytecode grind continues at 28x speed.
