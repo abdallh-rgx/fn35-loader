@@ -110,3 +110,16 @@
    attempting to mount.`  <-- NEVER reached in the old 30h chain
 - of.MainAppThread executing clean engine code
   (0x1012b40a8 <- 0x1018c23cc <- 0x102cfa618). No crashes, no poison.
+
+### 2026-10-30 ~20:30Z — CLEAN VM GRIND UNDERWAY (fresh boot)
+- Segments fresh10-13: of.MainAppThread +1.2B instr/segment steady
+  (6450M -> 7665M), inside the obfuscated-VM interpreter
+  (pc 0x102c3dcxx-0x102c3ddxx) with ZERO repair events — the fresh
+  VM state needs no vt-fix/vm-fix interventions at all.
+- pthread(0x3400) blocked on cond (mount-side waiter) — the deadlock
+  valve covers it if never signalled.
+- Projection: VM grind needs ~8-10h of wall time at 2.2M/s; cron
+  Job 478173 continues automatically (one_seg.sh carries all env
+  fixes: FN35_FREEZE_TIDS=8330, FN35_SPIN_BREAK=0).
+- Milestones still to come: mount completion -> LogInit project found
+  -> engine object boot -> renderer init -> FRAMES RENDERED.
