@@ -80,12 +80,30 @@ fi
 
 # ---- SNAPSHOT PERSIST (1:1 progress rule, extended to snapshots):
 # git ignores fn35/snap (too big) but the snapshot IS the progress.
-# Backup: after every clean segment, tar the snap dir and upload as the
-# 'snapshot-latest' asset of GitHub release tag 'snapshots' (background,
-# non-fatal). Restore: if a fresh-boot was intended but a backup exists
-# (flag file .snaprestore), pull it back instead of rebooting from zero.
+# Backup: after every clean segment, tar the snap dir and upload to a
+# ping-pong slot of GitHub release tag 'snapshots' (background,
+# non-fatal). Restore: whenever the local snapshot is missing (sandbox
+# wipe), pull the newest slot back instead of rebooting from zero.
 SNAPREL_TAG=snapshots
-SNAP_ASSET=snapshot-latest.tgz
+# PING-PONG SLOTS (2026-10-31): the old single-asset backup did
+# delete-then-upload; a sandbox recycle killed an in-flight upload and
+# left the release with ZERO assets -> every wipe became a fresh boot
+# and the multi-hour VM grind never accumulated. Two slots now:
+# upload to the slot NOT holding the newest backup (delete only the
+# OLDER one first), so a wipe at any point leaves the newest intact.
+snap_assets() { # prints "id name updated_at" per slot, newest last
+  TOKEN=$(cat /home/z/my-project/.gittoken 2>/dev/null) || return 0
+  curl -sL -H "Authorization: token $TOKEN" \
+    "https://api.github.com/repos/abdallh-rgx/fn35-loader/releases/tags/$SNAPREL_TAG" | \
+    python3 -c "
+import json,sys
+try: d=json.load(sys.stdin)
+except Exception: sys.exit(0)
+if not isinstance(d,dict): sys.exit(0)
+rows=[(a['id'],a['name'],a['updated_at']) for a in d.get('assets',[]) if a['name'] in ('snapshot-a.tgz','snapshot-b.tgz')]
+for r in sorted(rows,key=lambda x:x[2]): print(*r)
+" 2>/dev/null
+}
 snap_backup() {
   ( # background so the segment cadence never waits on the upload
     SBLOCK=/tmp/fn35_snapup.lock
@@ -103,8 +121,15 @@ snap_backup() {
         "$API/releases" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
     fi
     [ -z "$RID" ] && exit 0
-    AID=$(echo "$REL" | python3 -c "import json,sys;d=json.load(sys.stdin);print([a['id'] for a in d.get('assets',[]) if a['name']=='$SNAP_ASSET'][0] if d.get('assets') else '')" 2>/dev/null)
-    [ -n "$AID" ] && curl -sL -X DELETE -H "Authorization: token $TOKEN" "$API/releases/assets/$AID" >/dev/null
+    # write slot = the one NOT holding the newest backup
+    CUR=$(snap_assets | tail -1 | awk '{print $2}')
+    if [ -n "$CUR" ]; then
+      NEW=snapshot-b.tgz; [ "$CUR" = "snapshot-b.tgz" ] && NEW=snapshot-a.tgz
+    else
+      NEW=snapshot-a.tgz
+    fi
+    AID_OLD=$(snap_assets | awk -v s="$NEW" '$2==s{print $1}')
+    [ -n "$AID_OLD" ] && curl -sL -X DELETE -H "Authorization: token $TOKEN" "$API/releases/assets/$AID_OLD" >/dev/null
     SZ=$(stat -c%s "$TGZ")
     # NB: asset UPLOADS go to uploads.github.com (api.github.com rejects
     # the body with 410/404 silently - the reason the first backup
@@ -112,32 +137,39 @@ snap_backup() {
     curl -sL -H "Authorization: token $TOKEN" \
       -H "Content-Type: application/octet-stream" \
       --data-binary @"$TGZ" \
-      "https://uploads.github.com/repos/abdallh-rgx/fn35-loader/releases/$RID/assets?name=$SNAP_ASSET" >/dev/null
+      "https://uploads.github.com/repos/abdallh-rgx/fn35-loader/releases/$RID/assets?name=$NEW" >/dev/null
     # verify the asset actually landed (background uploads die silently)
-    VOK=$(curl -sL -H "Authorization: token $TOKEN" \
-      "$API/releases/tags/$SNAPREL_TAG" | \
-      python3 -c "import json,sys;d=json.load(sys.stdin);print(len([a for a in d.get('assets',[]) if a['name']=='$SNAP_ASSET']))" 2>/dev/null)
-    echo "[local] snapshot backed up to release '$SNAPREL_TAG' ($SZ bytes, verified=$VOK) $(date -u +%FT%TZ)" >> "$CONSOLE"
+    VOK=$(snap_assets | wc -l)
+    echo "[local] snapshot backed up to release '$SNAPREL_TAG' slot $NEW ($SZ bytes, slots=$VOK) $(date -u +%FT%TZ)" >> "$CONSOLE"
     rm -f "$TGZ"
   ) &
 }
 snap_restore() {
   TOKEN=$(cat /home/z/my-project/.gittoken 2>/dev/null) || return 0
   API=https://api.github.com/repos/abdallh-rgx/fn35-loader
-  REL=$(curl -sL -H "Authorization: token $TOKEN" "$API/releases/tags/$SNAPREL_TAG")
-  AID=$(echo "$REL" | python3 -c "import json,sys;d=json.load(sys.stdin);print([a['id'] for a in d.get('assets',[]) if a['name']=='$SNAP_ASSET'][0] if d.get('assets') else '')" 2>/dev/null)
-  [ -z "$AID" ] && return 0
-  echo "[local] restoring snapshot from release backup..." | tee -a "$CONSOLE"
+  # newest of the two ping-pong slots
+  BEST=$(snap_assets | tail -1)
+  [ -z "$BEST" ] && return 0
+  AID=$(echo "$BEST" | awk '{print $1}')
+  ANAME=$(echo "$BEST" | awk '{print $2}')
+  echo "[local] restoring snapshot $ANAME from release backup..." | tee -a "$CONSOLE"
   curl -sL -H "Authorization: token $TOKEN" -H "Accept: application/octet-stream" \
     "$API/releases/assets/$AID" -o "$F35/snapshot-latest.tgz"
-  if [ -s "$F35/snapshot-latest.tgz" ]; then
+  if [ -s "$F35/snapshot-latest.tgz" ] && tar tzf "$F35/snapshot-latest.tgz" >/dev/null 2>&1; then
     tar xzf "$F35/snapshot-latest.tgz" -C "$F35" && \
       echo "[local] snapshot restored: $(python3 -c "import json;d=json.load(open('$F35/snap/index.json'));print(d.get('phase'),d.get('init_index'))" 2>/dev/null)" | tee -a "$CONSOLE"
-    rm -f "$F35/snapshot-latest.tgz"
+  else
+    echo "[local] snapshot backup unreadable - FRESH BOOT" | tee -a "$CONSOLE"
   fi
-  rm -f "$F35/.snaprestore"
+  rm -f "$F35/snapshot-latest.tgz" "$F35/.snaprestore"
 }
-if [ -f "$F35/.snaprestore" ] && [ ! -f "$F35/snap/index.json" ]; then
+# RESTORE-ON-WIPE (2026-10-31): the sandbox recycles unpredictably
+# (fn35/, .gittoken, pip deps get wiped). The old .snaprestore flag gate
+# meant every recycle silently rebooted the chain from zero - the VM
+# grind to the first frame never accumulated across wipes. Now: whenever
+# the local snapshot is missing, pull the newest release slot instead.
+# (An intentional fresh boot = delete both slot assets from the release.)
+if [ ! -f "$F35/snap/index.json" ]; then
   snap_restore
 fi
 
